@@ -21,6 +21,13 @@ namespace SECinematicCamera.Director
             return false;
         }
 
+        public void SelectManual(ShotType shot)
+        {
+            CurrentShot = shot;
+            ShotAgeSeconds = 0f;
+            LastChangeReason = "Manual selection";
+        }
+
         public void Clear()
         {
             CurrentShot = ShotType.RearHighThreeQuarter;

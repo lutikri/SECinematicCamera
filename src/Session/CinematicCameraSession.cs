@@ -105,16 +105,14 @@ namespace SECinematicCamera.Session
 
         public void SelectManualShot(ShotType shot)
         {
-            if (shot != ShotType.RearHighThreeQuarter)
-            {
-                _logger.Info("That shot profile is not available in this milestone.");
-                return;
-            }
-
             if (!_active)
                 TryStart();
-            if (_active)
-                _logger.Info("Camera: RearHighThreeQuarter.");
+            if (!_active)
+                return;
+
+            _config.Automatic = false;
+            CutToShot(shot, "Manual selection");
+            _logger.Info("Camera: " + ShotProfile.Get(shot).Name + "; auto OFF.");
         }
 
         public string GetStatus()
@@ -160,6 +158,8 @@ namespace SECinematicCamera.Session
                 _director.Clear();
             if (_smoother != null)
                 _smoother.Clear();
+            if (_shotSolver != null)
+                _shotSolver.Clear();
             if (_camera != null)
                 _camera.ClearTransientState();
 
@@ -190,6 +190,7 @@ namespace SECinematicCamera.Session
 
             target.Refresh();
             _director.Reset(target);
+            _shotSolver.BeginShot(target, _director.CurrentShot);
             CameraPose initialPose = _shotSolver.Solve(target, _director.CurrentShot);
             initialPose = _smoother.Reset(initialPose);
             if (!_camera.TryEnterFixed(initialPose, out reason))
@@ -220,6 +221,16 @@ namespace SECinematicCamera.Session
             CameraPose desired = _shotSolver.Solve(_target, _director.CurrentShot);
             CameraPose pose = changed ? _smoother.Reset(desired) : _smoother.Step(desired, _config.Smoothing);
             _camera.ApplyPose(pose);
+        }
+
+        private void CutToShot(ShotType shot, string reason)
+        {
+            _target.Refresh();
+            _director.SelectManual(shot);
+            _shotSolver.BeginShot(_target, shot);
+            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, shot));
+            _camera.ApplyPose(pose);
+            _logger.Debug("CUT to " + ShotProfile.Get(shot).Name + " — " + reason + ".");
         }
     }
 }
