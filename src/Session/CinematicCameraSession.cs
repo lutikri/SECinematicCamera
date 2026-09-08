@@ -33,7 +33,7 @@ namespace SECinematicCamera.Session
             _config = new CinematicConfig();
             _logger = new CineLogger();
             _input = new InputManager(_config);
-            _commands = new CommandHandler();
+            _commands = new CommandHandler(this, _config, _logger);
             _targetResolver = new TargetResolver();
             _director = new CameraDirector();
             _shotSolver = new ShotSolver(_config);
@@ -65,6 +65,75 @@ namespace SECinematicCamera.Session
                 TryStart();
             else
                 EmergencyStop("Cinematic mode disabled.");
+        }
+
+        public void ToggleCinematic()
+        {
+            SetCinematicEnabled(!_active);
+        }
+
+        public void SetAutomatic(bool enabled)
+        {
+            _config.Automatic = enabled;
+            _logger.Info("Automatic shots " + (enabled ? "ON." : "OFF."));
+        }
+
+        public void SetDebug(bool enabled)
+        {
+            _config.DebugEnabled = enabled;
+            _logger.DebugEnabled = enabled;
+            _logger.Info("Debug " + (enabled ? "ON." : "OFF."));
+        }
+
+        public void ResetSettings()
+        {
+            _config.Reset();
+            _logger.DebugEnabled = _config.DebugEnabled;
+            _logger.Info("Runtime settings reset to compiled defaults.");
+        }
+
+        public void ForceNextShot()
+        {
+            if (!_active)
+            {
+                _logger.Info("Cinematic mode is OFF.");
+                return;
+            }
+
+            _logger.Info("Automatic shot selection is not available in this milestone.");
+        }
+
+        public void SelectManualShot(ShotType shot)
+        {
+            if (shot != ShotType.RearHighThreeQuarter)
+            {
+                _logger.Info("That shot profile is not available in this milestone.");
+                return;
+            }
+
+            if (!_active)
+                TryStart();
+            if (_active)
+                _logger.Info("Camera: RearHighThreeQuarter.");
+        }
+
+        public string GetStatus()
+        {
+            if (!_active || _target == null)
+                return "OFF; auto " + (_config.Automatic ? "ON" : "OFF") + ".";
+
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}",
+                _target.Grid.DisplayName, _director.CurrentShot, _director.ShotAgeSeconds,
+                _config.ShotDurationSeconds, _target.Speed, _director.LastChangeReason);
+        }
+
+        public string GetSettings()
+        {
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "duration {0:0.###}, distance {1:0.###}, height {2:0.###}, side {3:0.###}, smoothing {4:0.###}, lookahead {5:0.###}",
+                _config.ShotDurationSeconds, _config.Distance, _config.Height, _config.Side,
+                _config.Smoothing, _config.LookAheadSeconds);
         }
 
         public void EmergencyStop(string reason)
