@@ -56,7 +56,9 @@ namespace SECinematicCamera.Camera
         public bool HasExpectedCameraController()
         {
             return MyAPIGateway.Session != null && _expectedController != null &&
-                   object.ReferenceEquals(MyAPIGateway.Session.CameraController, _expectedController);
+                   object.ReferenceEquals(MyAPIGateway.Session.CameraController, _expectedController) &&
+                   MySpectator.Static != null &&
+                   MySpectator.Static.SpectatorCameraMovement == MySpectatorCameraMovementEnum.None;
         }
 
         public void ApplyPose(CameraPose pose)

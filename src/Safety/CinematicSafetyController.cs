@@ -35,6 +35,13 @@ namespace SECinematicCamera.Safety
                 return false;
             }
 
+            if (target.Controller.CubeGrid == null ||
+                target.Controller.CubeGrid.EntityId != target.GridEntityId)
+            {
+                reason = "Controlled grid changed unexpectedly.";
+                return false;
+            }
+
             if (!camera.HasExpectedCameraController())
             {
                 reason = "Another system or user action took camera control.";

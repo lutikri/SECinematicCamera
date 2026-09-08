@@ -56,7 +56,7 @@ namespace SECinematicCamera.Input
             }
             catch (Exception exception)
             {
-                _logger.Info("Command failed: " + exception.Message);
+                _session.EmergencyStop("Command exception: " + exception.Message);
             }
         }
 

@@ -35,7 +35,7 @@ namespace SECinematicCamera.Session
             _input = new InputManager(_config);
             _commands = new CommandHandler(this, _config, _logger);
             _targetResolver = new TargetResolver();
-            _director = new CameraDirector();
+            _director = new CameraDirector(_config);
             _shotSolver = new ShotSolver(_config);
             _smoother = new CameraSmoother();
             _camera = new SECameraAdapter();
@@ -100,7 +100,12 @@ namespace SECinematicCamera.Session
                 return;
             }
 
-            _logger.Info("Automatic shot selection is not available in this milestone.");
+            _target.Refresh();
+            if (_director.ForceNext(_target))
+            {
+                ApplyHardCut(_director.LastChangeReason);
+                _logger.Info("Camera: " + ShotProfile.Get(_director.CurrentShot).Name + ".");
+            }
         }
 
         public void SelectManualShot(ShotType shot)
@@ -111,7 +116,8 @@ namespace SECinematicCamera.Session
                 return;
 
             _config.Automatic = false;
-            CutToShot(shot, "Manual selection");
+            _director.SelectManual(shot);
+            ApplyHardCut(_director.LastChangeReason);
             _logger.Info("Camera: " + ShotProfile.Get(shot).Name + "; auto OFF.");
         }
 
@@ -219,18 +225,29 @@ namespace SECinematicCamera.Session
             _target.Refresh();
             bool changed = _director.Update(_target, TickSeconds);
             CameraPose desired = _shotSolver.Solve(_target, _director.CurrentShot);
-            CameraPose pose = changed ? _smoother.Reset(desired) : _smoother.Step(desired, _config.Smoothing);
+            CameraPose pose;
+            if (changed)
+            {
+                _shotSolver.BeginShot(_target, _director.CurrentShot);
+                desired = _shotSolver.Solve(_target, _director.CurrentShot);
+                pose = _smoother.Reset(desired);
+                _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name +
+                    " — " + _director.LastChangeReason + ".");
+            }
+            else
+            {
+                pose = _smoother.Step(desired, _config.Smoothing);
+            }
             _camera.ApplyPose(pose);
         }
 
-        private void CutToShot(ShotType shot, string reason)
+        private void ApplyHardCut(string reason)
         {
             _target.Refresh();
-            _director.SelectManual(shot);
-            _shotSolver.BeginShot(_target, shot);
-            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, shot));
+            _shotSolver.BeginShot(_target, _director.CurrentShot);
+            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, _director.CurrentShot));
             _camera.ApplyPose(pose);
-            _logger.Debug("CUT to " + ShotProfile.Get(shot).Name + " — " + reason + ".");
+            _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name + " — " + reason + ".");
         }
     }
 }
