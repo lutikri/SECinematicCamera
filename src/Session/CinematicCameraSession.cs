@@ -27,6 +27,7 @@ namespace SECinematicCamera.Session
         private CinematicSafetyController _safety;
         private CinematicTarget _target;
         private bool _active;
+        private float _debugReportSeconds;
 
         public override void BeforeStart()
         {
@@ -82,6 +83,7 @@ namespace SECinematicCamera.Session
         {
             _config.DebugEnabled = enabled;
             _logger.DebugEnabled = enabled;
+            _debugReportSeconds = 0f;
             _logger.Info("Debug " + (enabled ? "ON." : "OFF."));
         }
 
@@ -142,8 +144,8 @@ namespace SECinematicCamera.Session
 
         public void EmergencyStop(string reason)
         {
-            bool hadState = _active || (_camera != null && _camera.HasCapturedState);
             _active = false;
+            _debugReportSeconds = 0f;
 
             try
             {
@@ -169,7 +171,7 @@ namespace SECinematicCamera.Session
             if (_camera != null)
                 _camera.ClearTransientState();
 
-            if (hadState && _logger != null)
+            if (_logger != null)
                 _logger.Info("OFF — " + reason);
         }
 
@@ -204,12 +206,15 @@ namespace SECinematicCamera.Session
                 target.Clear();
                 _director.Clear();
                 _smoother.Clear();
+                _shotSolver.Clear();
+                _camera.ClearTransientState();
                 _logger.Info(reason);
                 return;
             }
 
             _target = target;
             _active = true;
+            _debugReportSeconds = 0f;
             _logger.Info("ON — RearHighThreeQuarter; target " + target.Grid.DisplayName + ".");
         }
 
@@ -239,6 +244,16 @@ namespace SECinematicCamera.Session
                 pose = _smoother.Step(desired, _config.Smoothing);
             }
             _camera.ApplyPose(pose);
+
+            if (_config.DebugEnabled)
+            {
+                _debugReportSeconds += TickSeconds;
+                if (_debugReportSeconds >= 5f)
+                {
+                    _debugReportSeconds = 0f;
+                    _logger.Debug(GetStatus());
+                }
+            }
         }
 
         private void ApplyHardCut(string reason)

@@ -15,6 +15,20 @@ V0 deliberately has no collision solver. It uses gravity-relative high camera pl
 
 Machine-specific Space Engineers paths belong in the ignored `mdk.local.ini`; never commit them or game DLLs.
 
+### Verified bootstrap machine
+
+Checked on 2026-09-08:
+
+- Visual Studio Community 2022 17.14.35 and Visual Studio Build Tools 2022 17.14.39 are installed.
+- The aggregate `Microsoft.VisualStudio.Workload.ManagedDesktop` workload is not installed. The individual .NET Framework 4.8 SDK, .NET Framework 4.8 targeting pack, Roslyn compiler, and MSBuild components required by this project are installed; a clean MDK2 build proves no additional Visual Studio component is currently required.
+- .NET SDK 9.0.317 is installed.
+- Git 2.50.1.windows.1 is installed.
+- `Mal.Mdk2.ScriptTemplates` 2.2.66 is installed and provides `mdk2mod`.
+- The project uses `Mal.Mdk2.ModAnalyzers` 2.1.16, `Mal.Mdk2.ModPackager` 2.2.11, and `Mal.Mdk2.References` 2.2.9.
+- The current Space Engineers client is `01_210_014` (Steam build `24675677`) at `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers`.
+
+No game DLL was copied or manually referenced. MDK2 resolves references from the installed client.
+
 ## Build and deploy
 
 From the repository root:
@@ -37,7 +51,7 @@ output=auto
 binarypath=auto
 ```
 
-The initial clean-template build successfully resolved `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers\Bin64` and deployed the local mod.
+The clean bootstrap and completed V0 builds both successfully resolved `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers\Bin64`. The completed Release build reports 0 warnings and 0 errors, including no MDK2 ModAPI whitelist analyzer diagnostics, and packs/deploys the source mod to the path above.
 
 ## Controls
 
@@ -52,6 +66,8 @@ The initial clean-template build successfully resolved `D:\ProgramFiles\Steam\st
 
 Handled `/cine` commands remain local and are not sent to chat or the server.
 
+Safe tuning ranges are: duration 1–60 seconds, distance 0.5–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
+
 ## V0 behavior
 
 - Targets only the locally controlled ship-controller/grid.
@@ -59,7 +75,11 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 - Restores the prior entity camera on exit or emergency shutdown.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
+- Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, and WorldLockedFlyBy profiles.
+- Selects automatic shots by weighted randomness using duration, recent-shot history, speed, angular motion, and side continuity. It never cuts directly between mirrored strong side shots.
 - Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.
+- Routes shutdown, camera takeover, invalid targets, and update/command exceptions through one idempotent `EmergencyStop(reason)` path.
+- Debug mode reports changes immediately and emits a non-spammy status line every five seconds.
 
 ## Known V0 limitations
 
@@ -68,6 +88,16 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 - Runtime tuning is not persisted.
 - Only the local controlled grid is supported.
 - In-game validation is required after each client update.
+
+## Manual in-game verification still required
+
+The build, analyzer, packaging, and local deployment are automated and verified. A live game session is still required to confirm:
+
+1. Add `SECinematicCamera` to a test world's mod list and load the world.
+2. Enter a ship or rover controller and press F9.
+3. Confirm the initial rear-high view, continued steering/thrust input, and F9 restoration of both first- and third-person views.
+4. Exercise each `/cine cam` profile, `/cine next`, automatic cuts, and the tuning commands.
+5. Trigger safe exits by leaving/changing the controlled seat and by manually taking camera control; confirm one shutdown message and no repeated camera fighting.
 
 ## Architecture
 

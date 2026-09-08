@@ -18,6 +18,7 @@ namespace SECinematicCamera.Camera
             public MySpectatorCameraMovementEnum SpectatorMovement;
             public Vector3D SpectatorPosition;
             public Vector3D SpectatorTarget;
+            public Vector3D SpectatorUp;
         }
 
         private CameraState _savedState;
@@ -93,7 +94,7 @@ namespace SECinematicCamera.Camera
             {
                 MyAPIGateway.Session.SetCameraController(ToCameraMode(state.SpectatorMovement), null, state.SpectatorPosition);
                 MySpectator.Static.Position = state.SpectatorPosition;
-                MySpectator.Static.SetTarget(state.SpectatorTarget, null);
+                MySpectator.Static.SetTarget(state.SpectatorTarget, state.SpectatorUp);
                 return;
             }
 
@@ -120,7 +121,8 @@ namespace SECinematicCamera.Camera
                 IsSpectator = entity == null,
                 SpectatorMovement = spectator.SpectatorCameraMovement,
                 SpectatorPosition = spectator.Position,
-                SpectatorTarget = spectator.Target
+                SpectatorTarget = spectator.Target,
+                SpectatorUp = spectator.Orientation.Up
             };
         }
 
