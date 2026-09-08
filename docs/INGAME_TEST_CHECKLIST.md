@@ -1,0 +1,123 @@
+# SECinematicCamera V0 in-game test checklist
+
+Use a disposable local test world. Start with a simple rover or small ship that has a cockpit, working propulsion, and enough open space to move safely.
+
+Record failures with the test number, what happened, the expected result, and the relevant lines from `SpaceEngineers.log`.
+
+## 1. Load and basic readiness
+
+- [ ] Add `SECinematicCamera` to the test world's active mod list.
+- [ ] Load the world without a mod compile error or crash.
+- [ ] Confirm there are no `SECinematicCamera` script errors in `SpaceEngineers.log`.
+- [ ] While on foot, press F9. Expected: cinematic mode does not start and a concise message says to control a ship or rover first.
+- [ ] Enter a cockpit or remote control attached to a valid grid.
+- [ ] Run `/cine status`. Expected: `OFF`, with the current automatic-mode state.
+- [ ] Run `/cine get`. Expected: the compiled runtime settings are shown.
+
+## 2. First milestone: activation and restoration
+
+- [ ] Begin in first-person cockpit view and note the exact view.
+- [ ] Press F9. Expected: cinematic mode turns ON in `RearHighThreeQuarter` and names the controlled grid.
+- [ ] While cinematic mode is active, steer, accelerate, brake, roll, and use normal ship/rover controls. Expected: the vehicle remains fully controllable.
+- [ ] Confirm the camera follows smoothly while staying in the same rear-high shot.
+- [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
+- [ ] Repeat from third-person view. Expected: F9 exit restores third-person view.
+- [ ] If spectator mode is available, activate from a spectator view, then exit. Expected: prior spectator position, aim/roll, and movement mode are restored as closely as possible.
+- [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
+
+## 3. Chat command handling
+
+- [ ] Run `/cine`. Expected: it toggles cinematic mode.
+- [ ] Run `/cine on` twice. Expected: cinematic mode remains ON without duplicating state.
+- [ ] Run `/cine off` twice. Expected: cinematic mode remains safely OFF.
+- [ ] Confirm handled `/cine` commands do not appear in multiplayer chat and are not sent to the server/other players.
+- [ ] Run `/cine help`. Expected: concise command usage appears.
+- [ ] Run an invalid command such as `/cine banana`. Expected: concise error and `/cine help` guidance, with no exception.
+- [ ] Run malformed commands such as `/cine cam`, `/cine auto maybe`, and `/cine set distance nope`. Expected: concise usage messages and no state corruption.
+
+## 4. Manual shot profiles
+
+Test these while stationary, moving forward, reversing, and turning:
+
+- [ ] `/cine cam rear` and `/cine cam 1`: RearHighThreeQuarter.
+- [ ] `/cine cam sideleft` and `/cine cam 2`: SideHighLeft.
+- [ ] `/cine cam sideright` and `/cine cam 3`: SideHighRight.
+- [ ] `/cine cam front` and `/cine cam 4`: FrontHighThreeQuarter.
+- [ ] `/cine cam overhead` and `/cine cam 5`: OverheadDrift.
+- [ ] `/cine cam flyby` and `/cine cam 6`: WorldLockedFlyBy.
+- [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
+- [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
+- [ ] For WorldLockedFlyBy, confirm the camera stays fixed in world space while its aim follows the moving vehicle.
+- [ ] Confirm selecting a manual shot turns automatic changes OFF.
+- [ ] Confirm all shots remain high relative to natural gravity; there should be no deliberate wheel-height or ground-level view.
+
+## 5. Automatic director and hard cuts
+
+- [ ] Run `/cine auto on` and `/cine set duration 3` to shorten the test cycle.
+- [ ] Drive continuously for at least two minutes. Expected: multiple shot types are selected and the order is not a fixed repeating sequence.
+- [ ] Confirm every automatic shot change is a hard cut with no interpolated path.
+- [ ] Confirm the camera still follows smoothly between cuts.
+- [ ] Confirm the director does not repeatedly select the same shot.
+- [ ] Confirm SideHighLeft never cuts directly to SideHighRight, and SideHighRight never cuts directly to SideHighLeft.
+- [ ] Drive quickly in a straight line. Expected: side and fly-by shots occur occasionally.
+- [ ] Turn or rotate strongly. Expected: unsuitable side shots are less common and OverheadDrift becomes more likely.
+- [ ] Stop or move very slowly. Expected: WorldLockedFlyBy becomes uncommon; RearHighThreeQuarter remains a safe option.
+- [ ] Run `/cine next` repeatedly. Expected: each command immediately hard-cuts to another eligible shot while preserving the side-continuity rule.
+
+## 6. Planet and zero-gravity orientation
+
+- [ ] On a planet, drive across slopes and uneven ground. Expected: camera Up remains aligned with natural gravity rather than rolling with the rover.
+- [ ] On a planet, point a ship steeply upward/downward. Expected: camera orientation remains stable and does not flip or produce an invalid view.
+- [ ] In zero gravity, rotate the ship through several orientations. Expected: grid orientation provides a stable fallback and the camera does not produce NaN-like jumps or disappear.
+- [ ] Repeat every manual profile in both natural gravity and zero gravity.
+
+## 7. Runtime tuning
+
+- [ ] Test `/cine set duration 5.0`; verify `/cine get` reports the change and automatic timing follows it.
+- [ ] Test `/cine set distance 3.4`; expected: camera distance changes without a shot transition.
+- [ ] Test `/cine set height 1.2`; expected: camera height changes.
+- [ ] Test `/cine set side 1.1`; expected: three-quarter/side bias changes.
+- [ ] Test `/cine set smoothing 0.05`, then `0.5`; expected: within-shot following changes from slower to faster without smoothing between cuts.
+- [ ] Test `/cine set lookahead 0`, then `1`; expected: aim lead visibly changes while moving.
+- [ ] Test values just inside and outside every documented safe range. Expected: valid values apply; invalid values are rejected cleanly.
+- [ ] Run `/cine reset`. Expected: all values return to compiled defaults, automatic mode turns ON, and debug mode turns OFF.
+- [ ] Reload the world after changing values. Expected: V0 runtime tuning is not persisted.
+
+## 8. Debug output
+
+- [ ] Run `/cine debug on`. Expected: confirmation is shown.
+- [ ] Confirm debug output identifies cinematic state, target, shot, shot age/duration, speed, and shot-change reason.
+- [ ] Let cinematic mode run for at least 15 seconds. Expected: status appears approximately every five seconds, not every simulation tick.
+- [ ] Trigger several shot cuts. Expected: each cut logs the selected shot and reason once.
+- [ ] Run `/cine debug off`. Expected: periodic status stops.
+
+## 9. Mandatory emergency-stop cases
+
+Perform these one at a time, re-entering cinematic mode between tests:
+
+- [ ] Leave the cockpit/control seat. Expected: one EmergencyStop reason, cinematic mode OFF, and no repeated camera fighting.
+- [ ] Transfer control to a different cockpit or remote control. Expected: controlled-entity-change EmergencyStop.
+- [ ] Close/remove/destroy the controlled cockpit. Expected: invalid controller/target EmergencyStop.
+- [ ] Split, close, remove, or destroy the target grid. Expected: invalid/changed grid EmergencyStop.
+- [ ] Use another game camera action that takes camera ownership. Expected: camera-takeover EmergencyStop; the mod does not reclaim the camera every tick.
+- [ ] Exit to the main menu while cinematic mode is ON. Expected: unload uses the same safe shutdown path and does not leave errors repeating in the log.
+- [ ] Save, reload, and re-enter the world. Expected: the mod initializes cleanly and F9 still works.
+- [ ] After every emergency case, run `/cine status` when possible. Expected: cinematic mode is OFF and a later activation works normally.
+
+## 10. Clipping expectations for V0
+
+- [ ] Test near a hangar wall, large grid, cliff, and terrain. Record any clipping, but do not treat ordinary obstruction avoidance as implemented behavior.
+- [ ] Confirm there is no visible low-camera or collision-avoidance behavior.
+- [ ] Report cases where a nominally high shot clips excessively under ordinary open-world driving; these may justify profile tuning without adding collision logic.
+
+## Completion criteria
+
+- [ ] No game crash, repeating exception, or permanently stuck camera.
+- [ ] Vehicle controls remain active for the entire cinematic session.
+- [ ] Original camera state restores reliably after normal exit and safe shutdown.
+- [ ] All six profiles work in gravity and zero gravity.
+- [ ] All shot changes are hard cuts.
+- [ ] Automatic selection is varied and obeys side continuity.
+- [ ] All handled commands remain local.
+- [ ] The post-test `SpaceEngineers.log` contains no recurring `SECinematicCamera` errors.
+

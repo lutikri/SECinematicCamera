@@ -111,3 +111,5 @@ The build, analyzer, packaging, and local deployment are automated and verified.
 - `src/Debug`: non-spammy local diagnostics.
 
 See [camera collision research](docs/CAMERA_COLLISION_RESEARCH.md) for the installed-client API investigation. Collision is intentionally outside V0.
+
+Use the [V0 in-game test checklist](docs/INGAME_TEST_CHECKLIST.md) for structured manual validation.
