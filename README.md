@@ -72,6 +72,8 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.5–20, height 0.1�
 
 - Targets only the locally controlled ship-controller/grid.
 - Switches the camera to `SpectatorFixed` without releasing ship control.
+- Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
+- Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
 - Restores the prior entity camera on exit or emergency shutdown.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
@@ -80,6 +82,8 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.5–20, height 0.1�
 - Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.
 - Routes shutdown, camera takeover, invalid targets, and update/command exceptions through one idempotent `EmergencyStop(reason)` path.
 - Debug mode reports changes immediately and emits a non-spammy status line every five seconds.
+
+The installed `MySpectator` API in client 1.210.014 does not expose `DisableRotation()` or a matching restoration method. Mouse rotation is therefore neutralized by `SpectatorCameraMovement = None` plus the authoritative absolute `Position` and `SetTarget` write each update. Because no separate rotation-disable state is changed, there is no hidden rotation flag to restore on shutdown.
 
 ## Known V0 limitations
 

@@ -28,6 +28,10 @@ namespace SECinematicCamera.Session
         private CinematicTarget _target;
         private bool _active;
         private float _debugReportSeconds;
+        private bool _spaceWasPressed;
+        private float _spaceDebugSeconds;
+        private VRageMath.Vector3D _spaceStartCameraPosition;
+        private VRageMath.Vector3D _spaceStartGridPosition;
 
         public override void BeforeStart()
         {
@@ -84,6 +88,8 @@ namespace SECinematicCamera.Session
             _config.DebugEnabled = enabled;
             _logger.DebugEnabled = enabled;
             _debugReportSeconds = 0f;
+            _spaceWasPressed = false;
+            _spaceDebugSeconds = 0f;
             _logger.Info("Debug " + (enabled ? "ON." : "OFF."));
         }
 
@@ -146,6 +152,8 @@ namespace SECinematicCamera.Session
         {
             _active = false;
             _debugReportSeconds = 0f;
+            _spaceWasPressed = false;
+            _spaceDebugSeconds = 0f;
 
             try
             {
@@ -215,7 +223,11 @@ namespace SECinematicCamera.Session
             _target = target;
             _active = true;
             _debugReportSeconds = 0f;
+            _spaceWasPressed = false;
+            _spaceDebugSeconds = 0f;
             _logger.Info("ON — RearHighThreeQuarter; target " + target.Grid.DisplayName + ".");
+            _logger.Debug("Spectator movement before activation: " + _camera.CapturedMovementName +
+                "; active: " + _camera.GetLastWriteDiagnostics().SpectatorMovement + ".");
         }
 
         private void UpdateCinematic()
@@ -244,6 +256,7 @@ namespace SECinematicCamera.Session
                 pose = _smoother.Step(desired, _config.Smoothing);
             }
             _camera.ApplyPose(pose);
+            UpdateSpectatorInputDiagnostics();
 
             if (_config.DebugEnabled)
             {
@@ -251,9 +264,61 @@ namespace SECinematicCamera.Session
                 if (_debugReportSeconds >= 5f)
                 {
                     _debugReportSeconds = 0f;
-                    _logger.Debug(GetStatus());
+                    CameraWriteDiagnostics diagnostics = _camera.GetLastWriteDiagnostics();
+                    _logger.Debug(GetStatus() + "; spectator movement " +
+                        diagnostics.SpectatorMovement + "; pose rewritten " +
+                        diagnostics.PoseRewrittenThisTick + ".");
                 }
             }
+        }
+
+        private void UpdateSpectatorInputDiagnostics()
+        {
+            if (!_config.DebugEnabled)
+                return;
+
+            bool spacePressed = _input.IsSpacePressed();
+            CameraWriteDiagnostics diagnostics = _camera.GetLastWriteDiagnostics();
+            if (spacePressed && !_spaceWasPressed)
+            {
+                _spaceStartCameraPosition = diagnostics.PositionBeforeWrite;
+                _spaceStartGridPosition = _target.Position;
+                _spaceDebugSeconds = 0f;
+                LogSpaceDiagnostics("Space DOWN", diagnostics);
+            }
+            else if (spacePressed)
+            {
+                _spaceDebugSeconds += TickSeconds;
+                if (_spaceDebugSeconds >= 1f)
+                {
+                    _spaceDebugSeconds = 0f;
+                    LogSpaceDiagnostics("Space HELD", diagnostics);
+                }
+            }
+            else if (_spaceWasPressed)
+            {
+                LogSpaceDiagnostics("Space UP", diagnostics);
+                _logger.Debug("Space interval delta — camera " +
+                    FormatVector(diagnostics.PositionAfterWrite - _spaceStartCameraPosition) +
+                    "; grid " + FormatVector(_target.Position - _spaceStartGridPosition) + ".");
+            }
+
+            _spaceWasPressed = spacePressed;
+        }
+
+        private void LogSpaceDiagnostics(string phase, CameraWriteDiagnostics diagnostics)
+        {
+            _logger.Debug(phase + " — movement " + diagnostics.SpectatorMovement +
+                "; camera before " + FormatVector(diagnostics.PositionBeforeWrite) +
+                "; after " + FormatVector(diagnostics.PositionAfterWrite) +
+                "; grid " + FormatVector(_target.Position) +
+                "; pose rewritten " + diagnostics.PoseRewrittenThisTick + ".");
+        }
+
+        private static string FormatVector(VRageMath.Vector3D value)
+        {
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "({0:0.00}, {1:0.00}, {2:0.00})", value.X, value.Y, value.Z);
         }
 
         private void ApplyHardCut(string reason)

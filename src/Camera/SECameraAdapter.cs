@@ -7,6 +7,14 @@ using VRageMath;
 
 namespace SECinematicCamera.Camera
 {
+    public struct CameraWriteDiagnostics
+    {
+        public Vector3D PositionBeforeWrite;
+        public Vector3D PositionAfterWrite;
+        public string SpectatorMovement;
+        public bool PoseRewrittenThisTick;
+    }
+
     public sealed class SECameraAdapter
     {
         private sealed class CameraState
@@ -23,8 +31,13 @@ namespace SECinematicCamera.Camera
 
         private CameraState _savedState;
         private IMyCameraController _expectedController;
+        private CameraWriteDiagnostics _lastWrite;
 
         public bool HasCapturedState { get { return _savedState != null; } }
+        public string CapturedMovementName
+        {
+            get { return _savedState != null ? _savedState.SpectatorMovement.ToString() : "Unavailable"; }
+        }
 
         public bool TryEnterFixed(CameraPose initialPose, out string reason)
         {
@@ -38,7 +51,11 @@ namespace SECinematicCamera.Camera
             CaptureCurrentState();
             try
             {
+                // Set this explicitly. Selecting SpectatorFixed alone does not reliably
+                // prevent the controlled ship's input from also driving MySpectator.
+                MySpectator.Static.SpectatorCameraMovement = MySpectatorCameraMovementEnum.None;
                 MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.SpectatorFixed, null, initialPose.Position);
+                MySpectator.Static.SpectatorCameraMovement = MySpectatorCameraMovementEnum.None;
                 _expectedController = MyAPIGateway.Session.CameraController;
                 if (_expectedController == null)
                     throw new System.InvalidOperationException("SpectatorFixed did not provide a camera controller.");
@@ -64,11 +81,27 @@ namespace SECinematicCamera.Camera
 
         public void ApplyPose(CameraPose pose)
         {
-            if (MySpectator.Static == null)
+            MySpectator spectator = MySpectator.Static;
+            if (spectator == null)
                 throw new System.InvalidOperationException("Spectator camera became unavailable.");
 
-            MySpectator.Static.Position = pose.Position;
-            MySpectator.Static.SetTarget(pose.LookAt, pose.Up);
+            _lastWrite.PoseRewrittenThisTick = false;
+            _lastWrite.PositionBeforeWrite = spectator.Position;
+
+            // The cinematic pose is authoritative and absolute. Never integrate from
+            // the spectator's current position, which may have received user input.
+            spectator.SpectatorCameraMovement = MySpectatorCameraMovementEnum.None;
+            spectator.Position = pose.Position;
+            spectator.SetTarget(pose.LookAt, pose.Up);
+
+            _lastWrite.PositionAfterWrite = spectator.Position;
+            _lastWrite.SpectatorMovement = spectator.SpectatorCameraMovement.ToString();
+            _lastWrite.PoseRewrittenThisTick = true;
+        }
+
+        public CameraWriteDiagnostics GetLastWriteDiagnostics()
+        {
+            return _lastWrite;
         }
 
         public void Restore()
@@ -87,6 +120,7 @@ namespace SECinematicCamera.Camera
                 MyAPIGateway.Session.SetCameraController(mode, state.Entity);
                 if (MyAPIGateway.Session.CameraController != null)
                     MyAPIGateway.Session.CameraController.IsInFirstPersonView = state.IsInFirstPerson;
+                RestoreSpectatorMovement(state);
                 return;
             }
 
@@ -95,17 +129,26 @@ namespace SECinematicCamera.Camera
                 MyAPIGateway.Session.SetCameraController(ToCameraMode(state.SpectatorMovement), null, state.SpectatorPosition);
                 MySpectator.Static.Position = state.SpectatorPosition;
                 MySpectator.Static.SetTarget(state.SpectatorTarget, state.SpectatorUp);
+                RestoreSpectatorMovement(state);
                 return;
             }
 
             IMyControllableEntity controlled = MyAPIGateway.Session.ControlledObject;
             MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity,
                 controlled != null ? controlled.Entity : null);
+            RestoreSpectatorMovement(state);
         }
 
         public void ClearTransientState()
         {
             _expectedController = null;
+            _lastWrite = default(CameraWriteDiagnostics);
+        }
+
+        private static void RestoreSpectatorMovement(CameraState state)
+        {
+            if (MySpectator.Static != null)
+                MySpectator.Static.SpectatorCameraMovement = state.SpectatorMovement;
         }
 
         private void CaptureCurrentState()

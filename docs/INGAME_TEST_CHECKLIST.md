@@ -25,7 +25,21 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] If spectator mode is available, activate from a spectator view, then exit. Expected: prior spectator position, aim/roll, and movement mode are restored as closely as possible.
 - [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
 
-## 3. Chat command handling
+## 3. Spectator input-isolation regression
+
+- [ ] Run `/cine debug on`, enter a ship/rover controller, and activate cinematic mode.
+- [ ] Confirm the activation log shows the spectator movement mode before activation and `None` while active.
+- [ ] Hold Space continuously for 3 seconds. Expected: the ship rises, the camera maintains its intended relation to the ship, and there is no additional spectator-camera drift.
+- [ ] Inspect the temporary Space diagnostics. Expected: they show camera position before/after the authoritative write, controlled-grid position, spectator movement `None`, and `pose rewritten True`.
+- [ ] Repeat with C. Expected: the ship moves downward while the camera only follows the solved cinematic pose.
+- [ ] Repeat with W, A, S, and D individually. Expected: ship input works and does not independently translate the spectator.
+- [ ] Move the mouse enough to command ship gyros. Expected: the ship rotates; mouse input does not leave the cinematic camera in a user-rotated pose.
+- [ ] Test both roll directions. Expected: the ship rolls; the camera continues using its gravity-relative or grid-relative solved orientation.
+- [ ] Combine translation, mouse/gyro, and roll controls for at least 15 seconds. Expected: no accumulating camera offset or rotation.
+- [ ] Turn cinematic mode OFF. Expected: the prior camera controller and the spectator movement mode captured at activation are restored.
+- [ ] Repeat activation from each available spectator movement mode. Expected: cinematic mode always uses `None`, and shutdown restores the prior mode.
+
+## 4. Chat command handling
 
 - [ ] Run `/cine`. Expected: it toggles cinematic mode.
 - [ ] Run `/cine on` twice. Expected: cinematic mode remains ON without duplicating state.
@@ -35,7 +49,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Run an invalid command such as `/cine banana`. Expected: concise error and `/cine help` guidance, with no exception.
 - [ ] Run malformed commands such as `/cine cam`, `/cine auto maybe`, and `/cine set distance nope`. Expected: concise usage messages and no state corruption.
 
-## 4. Manual shot profiles
+## 5. Manual shot profiles
 
 Test these while stationary, moving forward, reversing, and turning:
 
@@ -51,7 +65,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
 - [ ] Confirm all shots remain high relative to natural gravity; there should be no deliberate wheel-height or ground-level view.
 
-## 5. Automatic director and hard cuts
+## 6. Automatic director and hard cuts
 
 - [ ] Run `/cine auto on` and `/cine set duration 3` to shorten the test cycle.
 - [ ] Drive continuously for at least two minutes. Expected: multiple shot types are selected and the order is not a fixed repeating sequence.
@@ -64,14 +78,14 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Stop or move very slowly. Expected: WorldLockedFlyBy becomes uncommon; RearHighThreeQuarter remains a safe option.
 - [ ] Run `/cine next` repeatedly. Expected: each command immediately hard-cuts to another eligible shot while preserving the side-continuity rule.
 
-## 6. Planet and zero-gravity orientation
+## 7. Planet and zero-gravity orientation
 
 - [ ] On a planet, drive across slopes and uneven ground. Expected: camera Up remains aligned with natural gravity rather than rolling with the rover.
 - [ ] On a planet, point a ship steeply upward/downward. Expected: camera orientation remains stable and does not flip or produce an invalid view.
 - [ ] In zero gravity, rotate the ship through several orientations. Expected: grid orientation provides a stable fallback and the camera does not produce NaN-like jumps or disappear.
 - [ ] Repeat every manual profile in both natural gravity and zero gravity.
 
-## 7. Runtime tuning
+## 8. Runtime tuning
 
 - [ ] Test `/cine set duration 5.0`; verify `/cine get` reports the change and automatic timing follows it.
 - [ ] Test `/cine set distance 3.4`; expected: camera distance changes without a shot transition.
@@ -83,7 +97,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Run `/cine reset`. Expected: all values return to compiled defaults, automatic mode turns ON, and debug mode turns OFF.
 - [ ] Reload the world after changing values. Expected: V0 runtime tuning is not persisted.
 
-## 8. Debug output
+## 9. Debug output
 
 - [ ] Run `/cine debug on`. Expected: confirmation is shown.
 - [ ] Confirm debug output identifies cinematic state, target, shot, shot age/duration, speed, and shot-change reason.
@@ -91,7 +105,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Trigger several shot cuts. Expected: each cut logs the selected shot and reason once.
 - [ ] Run `/cine debug off`. Expected: periodic status stops.
 
-## 9. Mandatory emergency-stop cases
+## 10. Mandatory emergency-stop cases
 
 Perform these one at a time, re-entering cinematic mode between tests:
 
@@ -104,7 +118,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] Save, reload, and re-enter the world. Expected: the mod initializes cleanly and F9 still works.
 - [ ] After every emergency case, run `/cine status` when possible. Expected: cinematic mode is OFF and a later activation works normally.
 
-## 10. Clipping expectations for V0
+## 11. Clipping expectations for V0
 
 - [ ] Test near a hangar wall, large grid, cliff, and terrain. Record any clipping, but do not treat ordinary obstruction avoidance as implemented behavior.
 - [ ] Confirm there is no visible low-camera or collision-avoidance behavior.
@@ -120,4 +134,3 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] Automatic selection is varied and obeys side continuity.
 - [ ] All handled commands remain local.
 - [ ] The post-test `SpaceEngineers.log` contains no recurring `SECinematicCamera` errors.
-

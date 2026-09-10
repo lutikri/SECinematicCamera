@@ -16,5 +16,10 @@ namespace SECinematicCamera.Input
         {
             return MyAPIGateway.Input != null && MyAPIGateway.Input.IsNewKeyPressed(_config.ToggleKey);
         }
+
+        public bool IsSpacePressed()
+        {
+            return MyAPIGateway.Input != null && MyAPIGateway.Input.IsKeyPress(VRage.Input.MyKeys.Space);
+        }
     }
 }
