@@ -1,132 +1,182 @@
 # SECinematicCamera
 
-`SECinematicCamera` is a client-side Space Engineers Workshop mod that provides a GTA-style automatic cinematic camera for the locally controlled ship or rover.
+Space Engineers has excellent ships, planets, and enormous empty spaces—but no automatic cinematic camera for simply enjoying a flight.
 
-V0 deliberately has no collision solver. It uses gravity-relative tracking views, two close exterior mount views, and hard cuts between shots; it still has no low wheel/ground camera.
+`SECinematicCamera` is a client-side Workshop mod that tries to fill that gap. It simulates a GTA-style cinematic camera: a virtual director watches the locally controlled ship or rover, chooses a suitable shot, places the camera ahead of time, follows the action, and cuts to a new angle when the current shot has run its course.
 
-## Prerequisites
+The goal is not another third-person camera glued to the center of the grid. Different shots have different rules: some lag behind the motion like a human camera operator, some are briefly mounted to the ship, and fly-bys stay fixed in the world while the ship passes through the frame.
 
-- Space Engineers client `01_210_014` (Steam build `24675677` when this project was bootstrapped).
-- Space Engineers `Bin64`: `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers\Bin64` on the bootstrap machine.
-- .NET SDK 9.0 or later. The bootstrap machine uses 9.0.317.
-- MDK2 `mdk2mod` template and packages.
-- Visual Studio 2022, Rider, VS Code, or the `dotnet` CLI. Visual Studio's .NET desktop development workload is recommended.
+## Demo
+
+[![Watch the SECinematicCamera demo](docs/media/secinematic-camera-demo.jpg)](docs/media/secinematic-camera-demo.mp4)
+
+Click the image to open the 27-second MP4 demo.
+
+## What it does
+
+- Automatically selects shots using shot duration, recent shot history, speed, angular motion, and left/right continuity.
+- Uses hard cuts between cameras—there is no artificial flight from one camera position to the next.
+- Smooths position and aim *inside* a tracking shot, allowing the ship to move naturally within the frame during acceleration and rotation.
+- Keeps mounted shots short and rigid, with a subtle high-speed vibration.
+- Places fly-by cameras in world space and lets the ship pass them instead of attaching the camera to the grid.
+- Uses natural gravity as camera Up on planets and the occupied cockpit/controller orientation in zero gravity.
+- Keeps ordinary tracking shots inside safe screen margins while still allowing cinematic composition and lead room.
+- Preserves ship controls while cinematic mode is active.
+- Restores the original cockpit/third-person camera safely when cinematic mode ends.
+
+The current shot set includes:
+
+| Shot | Purpose |
+| --- | --- |
+| Rear High Three-Quarter | Safe chase view with the strongest acceleration response |
+| Side High Left / Right | Elevated profile shots with continuity protection |
+| Front High Three-Quarter | Forward-facing tracking shot |
+| Overhead Drift | Short top-down establishing view |
+| World-Locked Fly-By | Fixed camera that pans as the ship passes |
+| Front Mounted Close | Short action-camera view near the front of the ship |
+| Rear Mounted Forward | Short rear-mounted view looking along the ship |
+| Distant Top-Side | Long, slow establishing view that emphasizes the surrounding world |
+
+## How the system works
+
+1. **Target resolver** finds the locally occupied ship controller and its grid, including orientation, velocity, gravity, and oriented bounds.
+2. **Cinematic director** evaluates the available profiles and selects a suitable shot. It avoids immediate repeats and visually similar successors rather than cycling through a fixed list.
+3. **Shot solver** calculates an absolute world-space camera pose and a profile-specific point of interest. Each camera type can use its own composition and motion rules.
+4. **Camera smoother** gives free tracking shots position and aim inertia. Soft and hard framing limits prevent that lag from losing the ship.
+5. **Space Engineers adapter** takes exclusive control of `SpectatorFixed`, disables vanilla spectator movement, and writes the solved absolute pose every update.
+6. **Safety controller** watches camera ownership and target validity. Every failure uses one idempotent emergency-stop path that restores the normal player camera when possible.
+
+## Controls
+
+| Input | Action |
+| --- | --- |
+| `F9` | Toggle cinematic mode |
+| `V` while cinematic is active | Exit cinematic mode and return to the normal ship camera |
+| `Ctrl+F9` | Cut to the next manual test camera and disable automatic selection |
+| `/cine` | Toggle cinematic mode |
+| `/cine on` / `/cine off` | Explicitly enable or disable cinematic mode |
+| `/cine next` | Force the director to choose another suitable shot |
+| `/cine auto on` / `/cine auto off` | Enable or disable automatic shot changes |
+
+Manual camera selection:
+
+```text
+/cine cam rear
+/cine cam sideleft
+/cine cam sideright
+/cine cam front
+/cine cam overhead
+/cine cam flyby
+/cine cam frontmount
+/cine cam rearmount
+/cine cam distant
+/cine cam 1
+```
+
+Runtime tuning:
+
+```text
+/cine set duration 10
+/cine set distance 0.75
+/cine set height 1.2
+/cine set side 1.1
+/cine set smoothing 0.16
+/cine set lookahead 0.05
+```
+
+`distance` is relative to the vehicle size; `height` and `side` are ratios of that distance. Runtime tuning is not persisted yet. Use `/cine get` to view current values and `/cine reset` to restore the compiled defaults.
+
+Other commands: `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, and `/cine help`. Handled `/cine` commands stay local and are not sent to chat or the server.
+
+## Installation for players
+
+Until a Workshop release is available, build the project locally or copy a packaged mod into:
+
+```text
+%APPDATA%\SpaceEngineers\Mods\SECinematicCamera
+```
+
+Enable `SECinematicCamera` in the world's mod list, load the world, occupy a ship or rover controller, and press `F9`.
+
+## Building from source
+
+### Prerequisites
+
+- The current Steam version of Space Engineers.
+- .NET SDK 9.0 or later.
+- MDK2 with the `mdk2mod` template and packages.
 - Git.
+- Visual Studio 2022, Rider, VS Code, or the `dotnet` CLI.
 
-Machine-specific Space Engineers paths belong in the ignored `mdk.local.ini`; never commit them or game DLLs.
+Machine-specific Space Engineers paths belong in the ignored `mdk.local.ini`. Do not copy or commit game DLLs.
 
-### Verified bootstrap machine
-
-Checked on 2026-09-08:
-
-- Visual Studio Community 2022 17.14.35 and Visual Studio Build Tools 2022 17.14.39 are installed.
-- The aggregate `Microsoft.VisualStudio.Workload.ManagedDesktop` workload is not installed. The individual .NET Framework 4.8 SDK, .NET Framework 4.8 targeting pack, Roslyn compiler, and MSBuild components required by this project are installed; a clean MDK2 build proves no additional Visual Studio component is currently required.
-- .NET SDK 9.0.317 is installed.
-- Git 2.50.1.windows.1 is installed.
-- `Mal.Mdk2.ScriptTemplates` 2.2.66 is installed and provides `mdk2mod`.
-- The project uses `Mal.Mdk2.ModAnalyzers` 2.1.16, `Mal.Mdk2.ModPackager` 2.2.11, and `Mal.Mdk2.References` 2.2.9.
-- The current Space Engineers client is `01_210_014` (Steam build `24675677`) at `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers`.
-
-No game DLL was copied or manually referenced. MDK2 resolves references from the installed client.
-
-## Build and deploy
-
-From the repository root:
+Build and deploy from the repository root:
 
 ```powershell
 dotnet build .\SECinematicCamera.sln -c Release
 ```
 
-MDK2 resolves references from the current installed Space Engineers client, runs the ModAPI whitelist analyzer, compiles the mod, and deploys it to:
+MDK2 resolves references from the installed client, runs the ModAPI whitelist analyzer, compiles the mod, and deploys it locally. On the development machine used to bootstrap this project, the resulting path is:
 
 ```text
 C:\Users\artyo\AppData\Roaming\SpaceEngineers\Mods\SECinematicCamera
 ```
 
-The local MDK2 configuration used on the bootstrap machine is:
-
-```ini
-[mdk]
-output=auto
-binarypath=auto
-```
-
-The clean bootstrap and completed V0 builds both successfully resolved `D:\ProgramFiles\Steam\steamapps\common\SpaceEngineers\Bin64`. The completed Release build reports 0 warnings and 0 errors, including no MDK2 ModAPI whitelist analyzer diagnostics, and packs/deploys the source mod to the path above.
-
-## Controls
-
-- `F9`: toggle cinematic mode.
-- `V` while cinematic is active: leave cinematic mode and return to the controlled ship's normal first/third-person camera.
-- `Ctrl+F9`: hard-cut to the next manual test profile and turn automatic selection off. `F10` is deliberately not used because Space Engineers reserves it for the Blueprint screen.
-- `/cine`: toggle cinematic mode.
-- `/cine on` / `/cine off`: explicitly enable or disable it.
-- `/cine next`: hard-cut to another suitable automatic shot.
-- `/cine auto on|off`: enable or disable automatic shot changes.
-- `/cine cam <rear|sideleft|sideright|front|overhead|flyby|frontmount|rearmount|distant|1..9>`: manually select a shot.
-- `/cine set <duration|distance|height|side|smoothing|lookahead> <value>`: tune runtime parameters.
-- `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, `/cine help`.
-
-Handled `/cine` commands remain local and are not sent to chat or the server.
-
-Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
-
-`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: front mount lasts 2 seconds, rear mount and overhead last 2.5 seconds, and the distant establishing shot holds longer. A fly-by normally ends when the receding ship reaches 700 m from its fixed camera, with a long duration fallback. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
-
-## V0 behavior
-
-- Targets only the locally controlled ship-controller/grid.
-- Switches the camera to `SpectatorFixed` without releasing ship control.
-- Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
-- Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
-- Gives ordinary tracking rigs separate position and aim damping. Rotation changes therefore have camera weight instead of rigidly copying the grid orientation.
-- Gives each free tracking rig its own critically damped world-space pursuit. Camera position and aim have separate velocities: the ship can move through the frame while accelerating, then the virtual operator smoothly matches its motion. A soft boundary increases pursuit near the framing limit and a hard bound prevents losing the ship. Mounted cameras remain rigid and fly-by remains world-locked.
-- Low-pass filters the observed target velocity before feeding the pursuit controller, preventing individual thruster key transitions from behaving like direct camera commands.
-- Applies subtle multi-frequency positional/rotational shake only above 10 m/s and after tracking is solved, so shake never feeds back into damping. Mounted shots use a faster vibration profile; fly-by and distant establishing shots deliberately have no shake.
-- Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
-- Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
-- Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
-- Restores the controlled cockpit/entity as the actual camera owner on exit or emergency shutdown, with its saved first/third-person flag. This keeps subsequent vanilla V switching functional instead of leaving a spectator-style controller active.
-- F9 activation explicitly remembers the controlled cockpit view even though vanilla also binds F9 to SpectatorFixed. This prevents the vanilla F9 action from being mistaken for the view that must be restored.
-- Uses hard cuts between shots; smoothing applies only while following within one shot.
-- Uses natural gravity for stable Up on planets and the occupied cockpit/controller orientation as the authoritative zero-gravity frame.
-- Places each fly-by camera 60–100 m from the target, smoothly damps its pan without direction-flipping lead room, and relocates a manually selected fly-by after the ship recedes 700 m.
-- Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, WorldLockedFlyBy, FrontMountedClose, RearMountedForward, and DistantTopSide profiles.
-- Treats the original rear/side/front views as one orbit-shot family and never chooses another orbit angle immediately afterward. Front/rear shots also reject a visually similar front/rear mounted successor. Automatic selection favors fly-by, mounted, overhead, and distant establishing coverage according to motion instead of circling through four sides every few seconds.
-- Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.
-- Routes shutdown, camera takeover, invalid targets, and update/command exceptions through one idempotent `EmergencyStop(reason)` path.
-- Debug mode reports changes immediately and emits a non-spammy status line every five seconds.
-
-The installed `MySpectator` API in client 1.210.014 does not expose `DisableRotation()` or a matching restoration method. Mouse rotation is therefore neutralized by `SpectatorCameraMovement = None` plus the authoritative absolute `Position` and `SetTarget` write each update. Because no separate rotation-disable state is changed, there is no hidden rotation flag to restore on shutdown.
-
-## Known V0 limitations
-
-- No camera collision or occlusion handling.
-- High shots can still clip into very large structures, cliffs, terrain, or grids.
-- Runtime tuning is not persisted.
-- Only the local controlled grid is supported.
-- In-game validation is required after each client update.
-
-## Manual in-game verification still required
-
-The build, analyzer, packaging, and local deployment are automated and verified. A live game session is still required to confirm:
-
-1. Add `SECinematicCamera` to a test world's mod list and load the world.
-2. Enter a ship or rover controller and press F9.
-3. Confirm the initial rear-high view, continued steering/thrust input, and F9 restoration of both first- and third-person views.
-4. Exercise each `/cine cam` profile, `/cine next`, automatic cuts, and the tuning commands.
-5. Trigger safe exits by leaving/changing the controlled seat and by manually taking camera control; confirm one shutdown message and no repeated camera fighting.
+The verified Release build completes with **0 warnings and 0 errors**, including no MDK2 ModAPI whitelist analyzer diagnostics. No Space Engineers DLLs are stored in this repository.
 
 ## Architecture
 
-- `src/Session`: lifecycle, update boundary, activation, and emergency shutdown.
-- `src/Input`: hotkey and local chat command handling.
-- `src/Target`: locally controlled ship/grid resolution, oriented bounds, and semantic framing anchors.
-- `src/Director`: shot selection, history, continuity, and timing.
-- `src/Camera`: shot solving, screen-space composition, per-shot following, smoothing, and isolated Space Engineers camera access.
-- `src/Safety`: centralized safety checks and emergency-stop policy.
-- `src/Config`: defaults and runtime tuning.
-- `src/Debug`: non-spammy local diagnostics.
+```text
+src/
+  Session/    Lifecycle, update boundary, activation, and emergency shutdown
+  Input/      Hotkeys and local chat commands
+  Target/     Controlled-grid resolution, bounds, and framing anchors
+  Director/   Shot profiles, suitability, history, continuity, and timing
+  Camera/     Pose solving, composition, smoothing, shake, and SE camera adapter
+  Safety/     Central safety checks and emergency-stop policy
+  Config/     Compiled defaults and runtime tuning
+  Debug/      Non-spammy local diagnostics
+```
 
-See [camera collision research](docs/CAMERA_COLLISION_RESEARCH.md) for the installed-client API investigation. Collision is intentionally outside V0.
+Space Engineers camera-controller and spectator access is deliberately isolated in `SECameraAdapter`. Shot changes are always hard cuts; smoothing is allowed only while following within one shot.
 
-Use the [V0 in-game test checklist](docs/INGAME_TEST_CHECKLIST.md) for structured manual validation.
+## Roadmap
+
+### V0 — playable prototype
+
+- [x] Safe cinematic-mode toggle and normal-camera restoration
+- [x] Automatic director with history and shot suitability
+- [x] Tracking, mounted, overhead, distant, and world-locked fly-by cameras
+- [x] Per-shot following, aim smoothing, acceleration response, and shake
+- [x] Manual camera selection and runtime tuning commands
+- [x] Gravity-relative planetary framing and cockpit-relative zero-G framing
+- [x] MDK2 build, whitelist analysis, and local deployment
+- [ ] Continue tuning each camera independently for ships and rovers of very different sizes
+- [ ] Improve director pacing and selection weights from longer playtests
+- [ ] Complete in-game regression testing across first person, third person, seat changes, death, and world unload
+
+### V1 — camera safety and configuration
+
+- [ ] Camera collision and occlusion handling
+- [ ] Persistent user presets and per-shot configuration
+- [ ] Better support for unusual grids, subgrids, and offset cockpits
+- [ ] Optional HUD/debug overlay for composition and director decisions
+
+### Future experiments
+
+- [ ] More contextual shots for braking, landing, turning, and high-speed cruising
+- [ ] Multi-target framing for nearby ships or points of interest
+- [ ] User-defined camera anchors or tagged camera blocks
+- [ ] Shareable cinematic presets
+
+Roadmap items are intentions, not promises; Space Engineers ModAPI limitations may change their final design.
+
+## Current limitations
+
+- There is no camera collision or occlusion solver yet. Cameras can clip into terrain, large structures, or other grids.
+- Only the locally controlled ship or rover grid is supported.
+- Runtime tuning is reset when the session reloads.
+- Camera placement still needs profile-specific tuning for extremely small or very large grids.
+- In-game validation is required after Space Engineers client updates.
+
+For structured testing, see the [in-game checklist](docs/INGAME_TEST_CHECKLIST.md). The installed-client API investigation is documented in [camera collision research](docs/CAMERA_COLLISION_RESEARCH.md).
