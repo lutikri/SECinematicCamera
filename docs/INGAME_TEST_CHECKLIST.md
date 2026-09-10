@@ -61,11 +61,14 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] `/cine cam front` and `/cine cam 4`: FrontHighThreeQuarter.
 - [ ] `/cine cam overhead` and `/cine cam 5`: OverheadDrift.
 - [ ] `/cine cam flyby` and `/cine cam 6`: WorldLockedFlyBy.
+- [ ] `/cine cam frontmount` and `/cine cam 7`: FrontMountedClose.
+- [ ] `/cine cam rearmount` and `/cine cam 8`: RearMountedForward.
+- [ ] `/cine cam distant` and `/cine cam 9`: DistantTopSide.
 - [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
 - [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
 - [ ] For WorldLockedFlyBy, confirm the camera stays fixed in world space while its aim follows the moving vehicle.
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
-- [ ] Confirm all shots remain high relative to natural gravity; there should be no deliberate wheel-height or ground-level view.
+- [ ] Confirm orbit/overhead shots remain high relative to natural gravity. The two close mounted shots may sit close to the hull, but there should be no wheel-height or ground-level view.
 
 ### Composition checks
 
@@ -73,13 +76,16 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] In RearHighThreeQuarter, confirm the ship is intentionally offset from exact screen center and the view favors its forward/upper detail.
 - [ ] In FrontHighThreeQuarter, confirm the focus favors the nose/cockpit region rather than the geometric center.
 - [ ] In SideHighLeft and SideHighRight, fly forward and backward. Expected: the camera leaves visible lead room in the direction of screen-space travel.
-- [ ] Confirm the six profiles do not all place the ship at the same screen coordinate.
+- [ ] Confirm the nine profiles do not all place the ship at the same screen coordinate.
 - [ ] Rotate a long, wide, and tall grid. Expected: ordinary tracking shots keep the oriented grid bounds inside approximately 5% screen margins by moving outward when necessary.
 - [ ] Confirm bounds correction never produces a smooth travel path during a shot cut; manual and automatic shot changes remain hard cuts.
 
 ## 6. Automatic director and hard cuts
 
-- [ ] Run `/cine auto on` and `/cine set duration 3` to shorten the test cycle.
+- [ ] After `/cine reset`, confirm the ordinary base interval is about 10 seconds, not 5 seconds. Individual profile durations intentionally vary.
+- [ ] Run `/cine auto on` and `/cine set duration 3` only when shortening the test cycle is useful.
+- [ ] Observe at least ten automatic cuts at speed. Expected: rear/left/right/front orbit views do not dominate or appear consecutively as a four-sided rotation.
+- [ ] Confirm fly-by, mounted, overhead, and distant establishing coverage appears between orbit views.
 - [ ] Drive continuously for at least two minutes. Expected: multiple shot types are selected and the order is not a fixed repeating sequence.
 - [ ] Confirm every automatic shot change is a hard cut with no interpolated path.
 - [ ] Confirm the camera still follows smoothly between cuts.
@@ -109,7 +115,18 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Run `/cine reset`. Expected: all values return to compiled defaults, automatic mode turns ON, and debug mode turns OFF.
 - [ ] Reload the world after changing values. Expected: V0 runtime tuning is not persisted.
 
-## 9. Debug output
+## 9. Camera weight, acceleration lag, and shake
+
+- [ ] Select `/cine cam rear`, accelerate hard in a straight line, then stop thrust without braking. Expected: a short bounded camera yield during acceleration, followed by recovery; constant speed alone must not keep increasing the offset.
+- [ ] In `/cine cam rear`, yaw/pitch/roll the ship with the mouse and roll controls. Expected: the camera orientation follows with visible weight and catches up without losing the ship.
+- [ ] Confirm the subtle follow-camera shake is visible at speed but does not look like spectator input drift.
+- [ ] Select `/cine cam flyby`. Expected: the camera position stays world-locked and has no procedural shake.
+- [ ] Select `/cine cam frontmount`. Expected: a close camera sits just beyond the nose and looks back across the forward structure; vibration is small and faster than on tracking shots.
+- [ ] Select `/cine cam rearmount`. Expected: a close camera sits just behind/above the tail and looks forward along the ship; vibration is small and fast.
+- [ ] Select `/cine cam distant`. Expected: a very wide top-side view makes the ship small against the world and follows position/rotation with substantially more weight; it has no shake.
+- [ ] Test both mounted cameras on unusually shaped grids. They intentionally do not force the whole bounding box onscreen; note any placement inside blocks for later mount-clearance tuning.
+
+## 10. Debug output
 
 - [ ] Run `/cine debug on`. Expected: confirmation is shown.
 - [ ] Confirm debug output identifies cinematic state, target, shot, shot age/duration, speed, and shot-change reason.
@@ -117,7 +134,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Trigger several shot cuts. Expected: each cut logs the selected shot and reason once.
 - [ ] Run `/cine debug off`. Expected: periodic status stops.
 
-## 10. Mandatory emergency-stop cases
+## 11. Mandatory emergency-stop cases
 
 Perform these one at a time, re-entering cinematic mode between tests:
 
@@ -130,7 +147,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] Save, reload, and re-enter the world. Expected: the mod initializes cleanly and F9 still works.
 - [ ] After every emergency case, run `/cine status` when possible. Expected: cinematic mode is OFF and a later activation works normally.
 
-## 11. Clipping expectations for V0
+## 12. Clipping expectations for V0
 
 - [ ] Test near a hangar wall, large grid, cliff, and terrain. Record any clipping, but do not treat ordinary obstruction avoidance as implemented behavior.
 - [ ] Confirm there is no visible low-camera or collision-avoidance behavior.
@@ -141,7 +158,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] No game crash, repeating exception, or permanently stuck camera.
 - [ ] Vehicle controls remain active for the entire cinematic session.
 - [ ] Original camera state restores reliably after normal exit and safe shutdown.
-- [ ] All six profiles work in gravity and zero gravity.
+- [ ] All nine profiles work in gravity and zero gravity.
 - [ ] All shot changes are hard cuts.
 - [ ] Automatic selection is varied and obeys side continuity.
 - [ ] All handled commands remain local.

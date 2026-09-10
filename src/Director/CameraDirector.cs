@@ -14,7 +14,10 @@ namespace SECinematicCamera.Director
             ShotType.SideHighRight,
             ShotType.FrontHighThreeQuarter,
             ShotType.OverheadDrift,
-            ShotType.WorldLockedFlyBy
+            ShotType.WorldLockedFlyBy,
+            ShotType.FrontMountedClose,
+            ShotType.RearMountedForward,
+            ShotType.DistantTopSide
         };
 
         private readonly CinematicConfig _config;
@@ -24,6 +27,10 @@ namespace SECinematicCamera.Director
         public ShotType CurrentShot { get; private set; }
         public float ShotAgeSeconds { get; private set; }
         public string LastChangeReason { get; private set; }
+        public float CurrentDurationSeconds
+        {
+            get { return _config.ShotDurationSeconds * (float)ShotProfile.Get(CurrentShot).DurationScale; }
+        }
 
         public CameraDirector(CinematicConfig config)
         {
@@ -41,7 +48,7 @@ namespace SECinematicCamera.Director
         public bool Update(CinematicTarget target, float elapsedSeconds)
         {
             ShotAgeSeconds += elapsedSeconds;
-            if (!_config.Automatic || ShotAgeSeconds < _config.ShotDurationSeconds)
+            if (!_config.Automatic || ShotAgeSeconds < CurrentDurationSeconds)
                 return false;
 
             return ChangeTo(ChooseNext(target), "Duration elapsed; motion-weighted automatic choice");
@@ -89,10 +96,14 @@ namespace SECinematicCamera.Director
             {
                 ShotType candidate = AvailableShots[index];
                 double weight = Suitability(candidate, target);
-                if (candidate == CurrentShot || IsForbiddenMirrorCut(CurrentShot, candidate))
+                if (candidate == CurrentShot || IsForbiddenMirrorCut(CurrentShot, candidate) ||
+                    IsForbiddenMountedFlip(CurrentShot, candidate))
                     weight = 0.0;
                 else if (_history.Contains(candidate))
-                    weight *= 0.20;
+                    weight *= 0.12;
+
+                if (IsOrbitShot(CurrentShot) && IsOrbitShot(candidate))
+                    weight *= 0.18;
 
                 weights[index] = weight;
                 total += weight;
@@ -120,22 +131,42 @@ namespace SECinematicCamera.Director
             {
                 case ShotType.SideHighLeft:
                 case ShotType.SideHighRight:
-                    return (0.55 + Math.Min(speed / 25.0, 1.5)) * (angular > 0.6 ? 0.30 : 1.0);
+                    return (0.10 + Math.Min(speed / 100.0, 0.18)) * (angular > 0.6 ? 0.25 : 1.0);
                 case ShotType.FrontHighThreeQuarter:
-                    return 0.75 + Math.Min(speed / 40.0, 0.8);
+                    return 0.16 + Math.Min(speed / 160.0, 0.14);
                 case ShotType.OverheadDrift:
-                    return 0.65 + Math.Min(angular * 2.5, 2.0);
+                    return 0.35 + Math.Min(angular * 1.4, 1.2);
                 case ShotType.WorldLockedFlyBy:
-                    return speed < 3.0 ? 0.10 : 0.40 + Math.Min(speed / 20.0, 2.0);
+                    return speed < 5.0 ? 0.08 : 1.15 + Math.Min(speed / 45.0, 1.5);
+                case ShotType.FrontMountedClose:
+                    return speed < 4.0 ? 0.12 : 0.75 + Math.Min(speed / 90.0, 0.65);
+                case ShotType.RearMountedForward:
+                    return speed < 4.0 ? 0.10 : 0.65 + Math.Min(speed / 100.0, 0.55);
+                case ShotType.DistantTopSide:
+                    return 0.80 + Math.Min(speed / 140.0, 0.45);
                 default:
-                    return 1.35;
+                    return 0.45;
             }
+        }
+
+        private static bool IsOrbitShot(ShotType shot)
+        {
+            return shot == ShotType.RearHighThreeQuarter ||
+                   shot == ShotType.SideHighLeft ||
+                   shot == ShotType.SideHighRight ||
+                   shot == ShotType.FrontHighThreeQuarter;
         }
 
         private static bool IsForbiddenMirrorCut(ShotType from, ShotType to)
         {
             return (from == ShotType.SideHighLeft && to == ShotType.SideHighRight) ||
                    (from == ShotType.SideHighRight && to == ShotType.SideHighLeft);
+        }
+
+        private static bool IsForbiddenMountedFlip(ShotType from, ShotType to)
+        {
+            return (from == ShotType.FrontMountedClose && to == ShotType.RearMountedForward) ||
+                   (from == ShotType.RearMountedForward && to == ShotType.FrontMountedClose);
         }
 
         private void Remember(ShotType shot)

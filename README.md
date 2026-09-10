@@ -2,7 +2,7 @@
 
 `SECinematicCamera` is a client-side Space Engineers Workshop mod that provides a GTA-style automatic cinematic camera for the locally controlled ship or rover.
 
-V0 deliberately has no collision solver. It uses gravity-relative high camera placements and hard cuts between shots.
+V0 deliberately has no collision solver. It uses gravity-relative tracking views, two close exterior mount views, and hard cuts between shots; it still has no low wheel/ground camera.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ The clean bootstrap and completed V0 builds both successfully resolved `D:\Progr
 - `/cine on` / `/cine off`: explicitly enable or disable it.
 - `/cine next`: hard-cut to another suitable automatic shot.
 - `/cine auto on|off`: enable or disable automatic shot changes.
-- `/cine cam <rear|sideleft|sideright|front|overhead|flyby|1..6>`: manually select a shot.
+- `/cine cam <rear|sideleft|sideright|front|overhead|flyby|frontmount|rearmount|distant|1..9>`: manually select a shot.
 - `/cine set <duration|distance|height|side|smoothing|lookahead> <value>`: tune runtime parameters.
 - `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, `/cine help`.
 
@@ -68,7 +68,7 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 
 Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
 
-`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
+`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: fly-bys and mounted shots are shorter, while overhead and distant establishing shots hold longer. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
 
 ## V0 behavior
 
@@ -76,15 +76,17 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Switches the camera to `SpectatorFixed` without releasing ship control.
 - Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
 - Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
-- Compensates target translation before smoothing, so acceleration does not create a spring-like camera lag. Position smoothing affects the camera's relative shot offset instead of trailing the grid in world space.
+- Gives ordinary tracking rigs separate position and aim damping. Rotation changes therefore have camera weight instead of rigidly copying the grid orientation.
+- Adds bounded acceleration-only displacement to tracking shots. The camera yields while thrust changes velocity but does not accumulate a speed-proportional offset that can lose the ship.
+- Applies subtle multi-frequency positional/rotational shake after tracking is solved, so shake never feeds back into damping. Mounted shots use a faster vibration profile; fly-by and distant establishing shots deliberately have no shake.
 - Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
 - Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
 - Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
 - Restores the prior entity camera on exit or emergency shutdown.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
-- Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, and WorldLockedFlyBy profiles.
-- Selects automatic shots by weighted randomness using duration, recent-shot history, speed, angular motion, and side continuity. It never cuts directly between mirrored strong side shots.
+- Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, WorldLockedFlyBy, FrontMountedClose, RearMountedForward, and DistantTopSide profiles.
+- Treats the original rear/side/front views as one orbit-shot family and strongly discourages consecutive orbit angles. Automatic selection favors fly-by, mounted, overhead, and distant establishing coverage according to motion instead of circling through four sides every few seconds. It never cuts directly between mirrored strong side shots.
 - Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.
 - Routes shutdown, camera takeover, invalid targets, and update/command exceptions through one idempotent `EmergencyStop(reason)` path.
 - Debug mode reports changes immediately and emits a non-spammy status line every five seconds.

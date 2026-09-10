@@ -25,7 +25,7 @@ namespace SECinematicCamera.Camera
             CameraPose composed = AimForScreenPoint(basePose.Position, focus, basePose.Up,
                 screenX, profile.ScreenY, projection);
 
-            if (!profile.WorldLocked)
+            if (profile.KeepBoundsInFrame)
             {
                 double overflow = MeasureBoundsOverflow(composed, framing.Corners, projection);
                 if (overflow > 1.0)

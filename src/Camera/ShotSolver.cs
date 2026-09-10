@@ -31,6 +31,10 @@ namespace SECinematicCamera.Camera
                 lookAhead = Vector3D.Normalize(lookAhead) * maximumLookAhead;
 
             Vector3D lookAt = target.Position + lookAhead;
+
+            if (shot == ShotType.FrontMountedClose || shot == ShotType.RearMountedForward)
+                return SolveMounted(target, shot, lookAhead);
+
             double distance = target.Scale * _config.Distance;
             // Distance is the overall shot scale. Height and side are ratios of it,
             // so lowering distance brings the whole rig closer rather than changing
@@ -47,6 +51,34 @@ namespace SECinematicCamera.Camera
                 position = _worldLockedPosition;
 
             return new CameraPose(position, lookAt, up);
+        }
+
+        private static CameraPose SolveMounted(CinematicTarget target, ShotType shot,
+            Vector3D lookAhead)
+        {
+            FramingTarget framing = target.Framing;
+            double clearance = System.Math.Max(target.Grid.GridSize * 0.75, target.Scale * 0.025);
+            Vector3D position;
+            Vector3D lookAt;
+
+            if (shot == ShotType.FrontMountedClose)
+            {
+                position = framing.Nose + framing.Forward * clearance +
+                    framing.Up * framing.HalfHeight * 0.55 +
+                    framing.Right * framing.HalfWidth * 0.22;
+                lookAt = framing.Center + framing.Forward * framing.HalfLength * 0.05 +
+                    framing.Up * framing.HalfHeight * 0.12 + lookAhead * 0.15;
+            }
+            else
+            {
+                position = framing.Tail - framing.Forward * clearance +
+                    framing.Up * framing.HalfHeight * 0.58 -
+                    framing.Right * framing.HalfWidth * 0.18;
+                lookAt = framing.Nose + framing.Up * framing.HalfHeight * 0.08 +
+                    lookAhead * 0.15;
+            }
+
+            return new CameraPose(position, lookAt, framing.Up);
         }
 
         public void BeginShot(CinematicTarget target, ShotType shot)
