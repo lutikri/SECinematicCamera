@@ -79,7 +79,7 @@ namespace SECinematicCamera.Camera
             if (acceleration.LengthSquared() > maximumAcceleration * maximumAcceleration)
                 acceleration = Vector3D.Normalize(acceleration) * maximumAcceleration;
 
-            double filterAmount = DampAmount(0.18, elapsedSeconds, 1.0);
+            double filterAmount = DampAmount(0.10, elapsedSeconds, 1.0);
             _filteredAcceleration = Vector3D.Lerp(_filteredAcceleration, acceleration, filterAmount);
             Vector3D desiredLag = -_filteredAcceleration *
                 profile.AccelerationLagSeconds * profile.AccelerationLagSeconds;
@@ -89,7 +89,7 @@ namespace SECinematicCamera.Camera
             else if (desiredLag.LengthSquared() > maximumLag * maximumLag)
                 desiredLag = Vector3D.Normalize(desiredLag) * maximumLag;
 
-            double lagAmount = DampAmount(0.28, elapsedSeconds, 1.0);
+            double lagAmount = DampAmount(0.18, elapsedSeconds, 1.0);
             _accelerationOffset = Vector3D.Lerp(_accelerationOffset, desiredLag, lagAmount);
         }
 

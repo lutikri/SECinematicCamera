@@ -68,7 +68,7 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 
 Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
 
-`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: fly-bys and mounted shots are shorter, while overhead and distant establishing shots hold longer. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
+`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: mounted shots are shorter, while overhead and distant establishing shots hold longer. A fly-by normally ends when the receding ship reaches 700 m from its fixed camera, with a long duration fallback. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
 
 ## V0 behavior
 
@@ -86,7 +86,7 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
 - Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, WorldLockedFlyBy, FrontMountedClose, RearMountedForward, and DistantTopSide profiles.
-- Treats the original rear/side/front views as one orbit-shot family and strongly discourages consecutive orbit angles. Automatic selection favors fly-by, mounted, overhead, and distant establishing coverage according to motion instead of circling through four sides every few seconds. It never cuts directly between mirrored strong side shots.
+- Treats the original rear/side/front views as one orbit-shot family and never chooses another orbit angle immediately afterward. Front/rear shots also reject a visually similar front/rear mounted successor. Automatic selection favors fly-by, mounted, overhead, and distant establishing coverage according to motion instead of circling through four sides every few seconds.
 - Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.
 - Routes shutdown, camera takeover, invalid targets, and update/command exceptions through one idempotent `EmergencyStop(reason)` path.
 - Debug mode reports changes immediately and emits a non-spammy status line every five seconds.

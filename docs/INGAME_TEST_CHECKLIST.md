@@ -66,7 +66,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] `/cine cam distant` and `/cine cam 9`: DistantTopSide.
 - [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
 - [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
-- [ ] For WorldLockedFlyBy, confirm the camera stays fixed in world space while its aim follows the moving vehicle.
+- [ ] For WorldLockedFlyBy, confirm the camera stays fixed in world space while its aim follows the moving vehicle. With auto ON, it should cut after the receding grid reaches approximately 700 m from the camera.
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
 - [ ] Confirm orbit/overhead shots remain high relative to natural gravity. The two close mounted shots may sit close to the hull, but there should be no wheel-height or ground-level view.
 
@@ -84,7 +84,8 @@ Test these while stationary, moving forward, reversing, and turning:
 
 - [ ] After `/cine reset`, confirm the ordinary base interval is about 10 seconds, not 5 seconds. Individual profile durations intentionally vary.
 - [ ] Run `/cine auto on` and `/cine set duration 3` only when shortening the test cycle is useful.
-- [ ] Observe at least ten automatic cuts at speed. Expected: rear/left/right/front orbit views do not dominate or appear consecutively as a four-sided rotation.
+- [ ] Observe at least ten automatic cuts at speed. Expected: rear/left/right/front orbit views never follow one another as a four-sided rotation.
+- [ ] Confirm a rear orbit view does not cut directly to the rear-mounted view, and a front orbit view does not cut directly to the front-mounted view.
 - [ ] Confirm fly-by, mounted, overhead, and distant establishing coverage appears between orbit views.
 - [ ] Drive continuously for at least two minutes. Expected: multiple shot types are selected and the order is not a fixed repeating sequence.
 - [ ] Confirm every automatic shot change is a hard cut with no interpolated path.
@@ -117,7 +118,7 @@ Test these while stationary, moving forward, reversing, and turning:
 
 ## 9. Camera weight, acceleration lag, and shake
 
-- [ ] Select `/cine cam rear`, accelerate hard in a straight line, then stop thrust without braking. Expected: a short bounded camera yield during acceleration, followed by recovery; constant speed alone must not keep increasing the offset.
+- [ ] Select `/cine cam rear`, accelerate hard forward/backward and laterally, then stop thrust without braking. Expected: clearly visible but bounded camera yield during acceleration, followed by recovery; constant speed alone must not keep increasing the offset.
 - [ ] In `/cine cam rear`, yaw/pitch/roll the ship with the mouse and roll controls. Expected: the camera orientation follows with visible weight and catches up without losing the ship.
 - [ ] Confirm the subtle follow-camera shake is visible at speed but does not look like spectator input drift.
 - [ ] Select `/cine cam flyby`. Expected: the camera position stays world-locked and has no procedural shake.

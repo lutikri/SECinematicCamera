@@ -64,6 +64,11 @@ namespace SECinematicCamera.Director
             return ChangeTo(ChooseNext(target), "Forced next; motion-weighted choice");
         }
 
+        public bool RequestNext(CinematicTarget target, string reason)
+        {
+            return ChangeTo(ChooseNext(target), reason);
+        }
+
         public void Clear()
         {
             _history.Clear();
@@ -96,14 +101,12 @@ namespace SECinematicCamera.Director
             {
                 ShotType candidate = AvailableShots[index];
                 double weight = Suitability(candidate, target);
-                if (candidate == CurrentShot || IsForbiddenMirrorCut(CurrentShot, candidate) ||
+                if (candidate == CurrentShot || AreVisuallySimilar(CurrentShot, candidate) ||
+                    IsForbiddenMirrorCut(CurrentShot, candidate) ||
                     IsForbiddenMountedFlip(CurrentShot, candidate))
                     weight = 0.0;
                 else if (_history.Contains(candidate))
                     weight *= 0.12;
-
-                if (IsOrbitShot(CurrentShot) && IsOrbitShot(candidate))
-                    weight *= 0.18;
 
                 weights[index] = weight;
                 total += weight;
@@ -155,6 +158,17 @@ namespace SECinematicCamera.Director
                    shot == ShotType.SideHighLeft ||
                    shot == ShotType.SideHighRight ||
                    shot == ShotType.FrontHighThreeQuarter;
+        }
+
+        private static bool AreVisuallySimilar(ShotType from, ShotType to)
+        {
+            if (IsOrbitShot(from) && IsOrbitShot(to))
+                return true;
+
+            return (from == ShotType.RearHighThreeQuarter && to == ShotType.RearMountedForward) ||
+                   (from == ShotType.RearMountedForward && to == ShotType.RearHighThreeQuarter) ||
+                   (from == ShotType.FrontHighThreeQuarter && to == ShotType.FrontMountedClose) ||
+                   (from == ShotType.FrontMountedClose && to == ShotType.FrontHighThreeQuarter);
         }
 
         private static bool IsForbiddenMirrorCut(ShotType from, ShotType to)

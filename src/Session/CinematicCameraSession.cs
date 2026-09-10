@@ -245,7 +245,16 @@ namespace SECinematicCamera.Session
             }
 
             _target.Refresh();
-            bool changed = _director.Update(_target, TickSeconds);
+            bool changed;
+            if (_config.Automatic && _shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
+            {
+                changed = _director.RequestNext(_target,
+                    "Fly-by ended: target receded 700 m from the fixed camera");
+            }
+            else
+            {
+                changed = _director.Update(_target, TickSeconds);
+            }
             CameraPose desired = SolveComposedPose(_target, _director.CurrentShot);
             CameraPose pose;
             if (changed)

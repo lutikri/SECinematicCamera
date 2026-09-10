@@ -12,6 +12,7 @@ namespace SECinematicCamera.Camera
         private ShotType _activeShot;
         private bool _hasActiveShot;
         private Vector3D _worldLockedPosition;
+        private double _worldLockedClosestDistance;
 
         public ShotSolver(CinematicConfig config)
         {
@@ -89,8 +90,25 @@ namespace SECinematicCamera.Camera
             {
                 _hasActiveShot = false;
                 _worldLockedPosition = Solve(target, shot).Position;
+                _worldLockedClosestDistance = Vector3D.Distance(_worldLockedPosition, target.Position);
                 _hasActiveShot = true;
             }
+        }
+
+        public bool ShouldEndWorldLockedShot(CinematicTarget target, double exitDistance)
+        {
+            if (!_hasActiveShot || _activeShot != ShotType.WorldLockedFlyBy)
+                return false;
+
+            double distance = Vector3D.Distance(_worldLockedPosition, target.Position);
+            if (distance < _worldLockedClosestDistance)
+                _worldLockedClosestDistance = distance;
+
+            // The receding check prevents an unusually large grid from ending a
+            // fly-by instantly when its initial camera placement already exceeds
+            // the normal exit radius.
+            return distance >= exitDistance &&
+                distance > _worldLockedClosestDistance + System.Math.Min(25.0, exitDistance * 0.05);
         }
 
         public void Clear()
@@ -98,6 +116,7 @@ namespace SECinematicCamera.Camera
             _activeShot = ShotType.RearHighThreeQuarter;
             _hasActiveShot = false;
             _worldLockedPosition = Vector3D.Zero;
+            _worldLockedClosestDistance = 0.0;
         }
 
         private static void ResolveFrame(CinematicTarget target, out Vector3D up,
