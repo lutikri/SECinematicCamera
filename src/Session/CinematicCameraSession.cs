@@ -22,6 +22,7 @@ namespace SECinematicCamera.Session
         private TargetResolver _targetResolver;
         private CameraDirector _director;
         private ShotSolver _shotSolver;
+        private ScreenComposer _screenComposer;
         private CameraSmoother _smoother;
         private SECameraAdapter _camera;
         private CinematicSafetyController _safety;
@@ -42,6 +43,7 @@ namespace SECinematicCamera.Session
             _targetResolver = new TargetResolver();
             _director = new CameraDirector(_config);
             _shotSolver = new ShotSolver(_config);
+            _screenComposer = new ScreenComposer();
             _smoother = new CameraSmoother();
             _camera = new SECameraAdapter();
             _safety = new CinematicSafetyController();
@@ -135,9 +137,10 @@ namespace SECinematicCamera.Session
                 return "OFF; auto " + (_config.Automatic ? "ON" : "OFF") + ".";
 
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}",
+                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}; {6}",
                 _target.Grid.DisplayName, _director.CurrentShot, _director.ShotAgeSeconds,
-                _config.ShotDurationSeconds, _target.Speed, _director.LastChangeReason);
+                _config.ShotDurationSeconds, _target.Speed, _director.LastChangeReason,
+                _screenComposer.GetDiagnostics());
         }
 
         public string GetSettings()
@@ -207,7 +210,7 @@ namespace SECinematicCamera.Session
             target.Refresh();
             _director.Reset(target);
             _shotSolver.BeginShot(target, _director.CurrentShot);
-            CameraPose initialPose = _shotSolver.Solve(target, _director.CurrentShot);
+            CameraPose initialPose = SolveComposedPose(target, _director.CurrentShot);
             initialPose = _smoother.Reset(initialPose, target.Position);
             if (!_camera.TryEnterFixed(initialPose, out reason))
             {
@@ -241,12 +244,12 @@ namespace SECinematicCamera.Session
 
             _target.Refresh();
             bool changed = _director.Update(_target, TickSeconds);
-            CameraPose desired = _shotSolver.Solve(_target, _director.CurrentShot);
+            CameraPose desired = SolveComposedPose(_target, _director.CurrentShot);
             CameraPose pose;
             if (changed)
             {
                 _shotSolver.BeginShot(_target, _director.CurrentShot);
-                desired = _shotSolver.Solve(_target, _director.CurrentShot);
+                desired = SolveComposedPose(_target, _director.CurrentShot);
                 pose = _smoother.Reset(desired, _target.Position);
                 _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name +
                     " — " + _director.LastChangeReason + ".");
@@ -326,10 +329,17 @@ namespace SECinematicCamera.Session
         {
             _target.Refresh();
             _shotSolver.BeginShot(_target, _director.CurrentShot);
-            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, _director.CurrentShot),
+            CameraPose pose = _smoother.Reset(SolveComposedPose(_target, _director.CurrentShot),
                 _target.Position);
             _camera.ApplyPose(pose);
             _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name + " — " + reason + ".");
+        }
+
+        private CameraPose SolveComposedPose(CinematicTarget target, ShotType shot)
+        {
+            CameraPose basePose = _shotSolver.Solve(target, shot);
+            return _screenComposer.Compose(basePose, target, ShotProfile.Get(shot),
+                _camera.GetProjectionInfo());
         }
     }
 }

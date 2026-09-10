@@ -67,6 +67,16 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
 - [ ] Confirm all shots remain high relative to natural gravity; there should be no deliberate wheel-height or ground-level view.
 
+### Composition checks
+
+- [ ] Run `/cine reset` and `/cine get`. Expected: the default distance is `0.75`.
+- [ ] In RearHighThreeQuarter, confirm the ship is intentionally offset from exact screen center and the view favors its forward/upper detail.
+- [ ] In FrontHighThreeQuarter, confirm the focus favors the nose/cockpit region rather than the geometric center.
+- [ ] In SideHighLeft and SideHighRight, fly forward and backward. Expected: the camera leaves visible lead room in the direction of screen-space travel.
+- [ ] Confirm the six profiles do not all place the ship at the same screen coordinate.
+- [ ] Rotate a long, wide, and tall grid. Expected: ordinary tracking shots keep the oriented grid bounds inside approximately 5% screen margins by moving outward when necessary.
+- [ ] Confirm bounds correction never produces a smooth travel path during a shot cut; manual and automatic shot changes remain hard cuts.
+
 ## 6. Automatic director and hard cuts
 
 - [ ] Run `/cine auto on` and `/cine set duration 3` to shorten the test cycle.
@@ -90,7 +100,7 @@ Test these while stationary, moving forward, reversing, and turning:
 ## 8. Runtime tuning
 
 - [ ] Test `/cine set duration 5.0`; verify `/cine get` reports the change and automatic timing follows it.
-- [ ] Test `/cine set distance 0.5`, then `0.3`; expected: the entire camera rig moves closer, including its height and side offsets, without a shot transition.
+- [ ] Test `/cine set distance 0.75`, then `0.5`; expected: the entire camera rig moves closer, including its height and side offsets, without a shot transition.
 - [ ] Test `/cine set height 1.2`; expected: camera height changes.
 - [ ] Test `/cine set side 1.1`; expected: three-quarter/side bias changes.
 - [ ] Test `/cine set smoothing 0.05`, then `0.5`; expected: within-shot following changes from slower to faster without smoothing between cuts.

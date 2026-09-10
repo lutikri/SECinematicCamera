@@ -104,6 +104,21 @@ namespace SECinematicCamera.Camera
             return _lastWrite;
         }
 
+        public CameraProjectionInfo GetProjectionInfo()
+        {
+            if (MyAPIGateway.Session == null || MyAPIGateway.Session.Camera == null)
+                return new CameraProjectionInfo(1.0, 0.75);
+
+            MatrixD projection = MyAPIGateway.Session.Camera.ProjectionMatrix;
+            double horizontal = System.Math.Abs(projection.M11) > 0.0001
+                ? 1.0 / System.Math.Abs(projection.M11)
+                : 1.0;
+            double vertical = System.Math.Abs(projection.M22) > 0.0001
+                ? 1.0 / System.Math.Abs(projection.M22)
+                : 0.75;
+            return new CameraProjectionInfo(horizontal, vertical);
+        }
+
         public void Restore()
         {
             CameraState state = _savedState;

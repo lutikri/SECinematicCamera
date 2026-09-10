@@ -15,6 +15,7 @@ namespace SECinematicCamera.Target
         public Vector3 LinearVelocity { get; private set; }
         public Vector3 AngularVelocity { get; private set; }
         public double Scale { get; private set; }
+        public FramingTarget Framing { get; private set; }
 
         public bool IsValid
         {
@@ -34,6 +35,7 @@ namespace SECinematicCamera.Target
             Grid = grid;
             ControlledEntityId = controller.EntityId;
             GridEntityId = grid.EntityId;
+            Framing = new FramingTarget();
             Refresh();
         }
 
@@ -42,11 +44,12 @@ namespace SECinematicCamera.Target
             if (!IsValid)
                 return;
 
-            Position = Grid.WorldAABB.Center;
+            Framing.Refresh(Controller, Grid);
+            Position = Framing.Center;
             WorldMatrix = Grid.WorldMatrix;
             LinearVelocity = Grid.Physics != null ? Grid.Physics.LinearVelocity : Vector3.Zero;
             AngularVelocity = Grid.Physics != null ? Grid.Physics.AngularVelocity : Vector3.Zero;
-            Scale = System.Math.Max(5.0, Grid.WorldAABB.HalfExtents.Length());
+            Scale = System.Math.Max(5.0, Framing.Radius);
         }
 
         public void Clear()
@@ -60,6 +63,8 @@ namespace SECinematicCamera.Target
             LinearVelocity = Vector3.Zero;
             AngularVelocity = Vector3.Zero;
             Scale = 0;
+            if (Framing != null)
+                Framing.Clear();
         }
     }
 }

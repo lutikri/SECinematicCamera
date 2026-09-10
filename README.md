@@ -68,7 +68,7 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 
 Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
 
-`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are distance `0.5`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
+`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
 
 ## V0 behavior
 
@@ -77,6 +77,9 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
 - Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
 - Compensates target translation before smoothing, so acceleration does not create a spring-like camera lag. Position smoothing affects the camera's relative shot offset instead of trailing the grid in world space.
+- Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
+- Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
+- Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
 - Restores the prior entity camera on exit or emergency shutdown.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
@@ -110,9 +113,9 @@ The build, analyzer, packaging, and local deployment are automated and verified.
 
 - `src/Session`: lifecycle, update boundary, activation, and emergency shutdown.
 - `src/Input`: hotkey and local chat command handling.
-- `src/Target`: locally controlled ship/grid resolution and target snapshot.
+- `src/Target`: locally controlled ship/grid resolution, oriented bounds, and semantic framing anchors.
 - `src/Director`: shot selection, history, continuity, and timing.
-- `src/Camera`: shot solving, per-shot following, smoothing, and isolated Space Engineers camera access.
+- `src/Camera`: shot solving, screen-space composition, per-shot following, smoothing, and isolated Space Engineers camera access.
 - `src/Safety`: centralized safety checks and emergency-stop policy.
 - `src/Config`: defaults and runtime tuning.
 - `src/Debug`: non-spammy local diagnostics.

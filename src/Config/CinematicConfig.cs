@@ -5,7 +5,7 @@ namespace SECinematicCamera.Config
     public sealed class CinematicConfig
     {
         public const float DefaultShotDurationSeconds = 5f;
-        public const double DefaultDistance = 0.5;
+        public const double DefaultDistance = 0.75;
         public const double DefaultHeight = 1.2;
         public const double DefaultSide = 1.1;
         public const double DefaultSmoothing = 0.16;
