@@ -8,9 +8,11 @@ The goal is not another third-person camera glued to the center of the grid. Dif
 
 ## Demo
 
-[![Watch the SECinematicCamera demo](docs/media/secinematic-camera-demo.jpg)](docs/media/secinematic-camera-demo.mp4)
+https://github.com/user-attachments/assets/0fdadb40-a6a4-40ee-b30c-bb1171c5eb69
 
-Click the image to open the 27-second MP4 demo.
+
+
+
 
 ## What it does
 
