@@ -12,6 +12,8 @@ namespace SECinematicCamera.Config
         public const double DefaultLookAheadSeconds = 0.05;
 
         public MyKeys ToggleKey { get; private set; }
+        public MyKeys ExitKey { get; private set; }
+        public MyKeys CycleKey { get; private set; }
         public float ShotDurationSeconds { get; set; }
         public double Distance { get; set; }
         public double Height { get; set; }
@@ -24,6 +26,8 @@ namespace SECinematicCamera.Config
         public CinematicConfig()
         {
             ToggleKey = MyKeys.F9;
+            ExitKey = MyKeys.V;
+            CycleKey = MyKeys.F9;
             Reset();
         }
 

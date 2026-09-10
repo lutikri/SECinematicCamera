@@ -56,6 +56,8 @@ The clean bootstrap and completed V0 builds both successfully resolved `D:\Progr
 ## Controls
 
 - `F9`: toggle cinematic mode.
+- `V` while cinematic is active: leave cinematic mode and return to the controlled ship's normal first/third-person camera.
+- `Ctrl+F9`: hard-cut to the next manual test profile and turn automatic selection off. `F10` is deliberately not used because Space Engineers reserves it for the Blueprint screen.
 - `/cine`: toggle cinematic mode.
 - `/cine on` / `/cine off`: explicitly enable or disable it.
 - `/cine next`: hard-cut to another suitable automatic shot.
@@ -68,7 +70,7 @@ Handled `/cine` commands remain local and are not sent to chat or the server.
 
 Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
 
-`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: mounted shots are shorter, while overhead and distant establishing shots hold longer. A fly-by normally ends when the receding ship reaches 700 m from its fixed camera, with a long duration fallback. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
+`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are base duration `10` seconds, distance `0.75`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Each profile applies a duration multiplier: front mount lasts 2 seconds, rear mount and overhead last 2.5 seconds, and the distant establishing shot holds longer. A fly-by normally ends when the receding ship reaches 700 m from its fixed camera, with a long duration fallback. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
 
 ## V0 behavior
 
@@ -78,13 +80,16 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
 - Gives ordinary tracking rigs separate position and aim damping. Rotation changes therefore have camera weight instead of rigidly copying the grid orientation.
 - Gives each free tracking rig its own critically damped world-space pursuit. Camera position and aim have separate velocities: the ship can move through the frame while accelerating, then the virtual operator smoothly matches its motion. A soft boundary increases pursuit near the framing limit and a hard bound prevents losing the ship. Mounted cameras remain rigid and fly-by remains world-locked.
+- Low-pass filters the observed target velocity before feeding the pursuit controller, preventing individual thruster key transitions from behaving like direct camera commands.
 - Applies subtle multi-frequency positional/rotational shake only above 10 m/s and after tracking is solved, so shake never feeds back into damping. Mounted shots use a faster vibration profile; fly-by and distant establishing shots deliberately have no shake.
 - Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
 - Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
 - Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
 - Restores the prior entity camera on exit or emergency shutdown.
+- F9 activation explicitly remembers the controlled cockpit view even though vanilla also binds F9 to SpectatorFixed. This prevents the vanilla F9 action from being mistaken for the view that must be restored.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
-- Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.
+- Uses natural gravity for stable Up on planets and the occupied cockpit/controller orientation as the authoritative zero-gravity frame.
+- Places each fly-by camera 60–100 m from the target, smoothly damps its pan without direction-flipping lead room, and relocates a manually selected fly-by after the ship recedes 700 m.
 - Provides RearHighThreeQuarter, SideHighLeft, SideHighRight, FrontHighThreeQuarter, OverheadDrift, WorldLockedFlyBy, FrontMountedClose, RearMountedForward, and DistantTopSide profiles.
 - Treats the original rear/side/front views as one orbit-shot family and never chooses another orbit angle immediately afterward. Front/rear shots also reject a visually similar front/rear mounted successor. Automatic selection favors fly-by, mounted, overhead, and distant establishing coverage according to motion instead of circling through four sides every few seconds.
 - Stops safely if the target, player, controlled entity, or expected camera controller becomes invalid.

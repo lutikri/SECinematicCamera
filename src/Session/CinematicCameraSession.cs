@@ -56,8 +56,23 @@ namespace SECinematicCamera.Session
         {
             try
             {
-                if (_input != null && _input.IsTogglePressed())
-                    SetCinematicEnabled(!_active);
+                if (_input != null && _active && _input.IsExitPressed())
+                {
+                    EmergencyStop("Vanilla view requested with V.", true);
+                    return;
+                }
+
+                if (_input != null && _input.IsCyclePressed())
+                {
+                    CycleManualShot();
+                }
+                else if (_input != null && _input.IsTogglePressed())
+                {
+                    if (_active)
+                        EmergencyStop("Cinematic mode disabled.");
+                    else
+                        TryStart(true);
+                }
 
                 if (_active)
                     UpdateCinematic();
@@ -79,6 +94,20 @@ namespace SECinematicCamera.Session
         public void ToggleCinematic()
         {
             SetCinematicEnabled(!_active);
+        }
+
+        public void CycleManualShot()
+        {
+            if (!_active)
+            {
+                TryStart(true);
+                return;
+            }
+
+            _config.Automatic = false;
+            _director.SelectNextManual();
+            ApplyHardCut(_director.LastChangeReason);
+            _logger.Info("Camera: " + ShotProfile.Get(_director.CurrentShot).Name + "; auto OFF.");
         }
 
         public void SetAutomatic(bool enabled)
@@ -153,7 +182,7 @@ namespace SECinematicCamera.Session
                 _config.Smoothing, _config.LookAheadSeconds);
         }
 
-        public void EmergencyStop(string reason)
+        public void EmergencyStop(string reason, bool forceControlledView = false)
         {
             _active = false;
             _debugReportSeconds = 0f;
@@ -163,7 +192,7 @@ namespace SECinematicCamera.Session
             try
             {
                 if (_camera != null)
-                    _camera.Restore();
+                    _camera.Restore(forceControlledView);
             }
             catch (System.Exception restoreException)
             {
@@ -196,7 +225,7 @@ namespace SECinematicCamera.Session
             base.UnloadData();
         }
 
-        private void TryStart()
+        private void TryStart(bool preferControlledView = false)
         {
             if (_active)
                 return;
@@ -214,7 +243,7 @@ namespace SECinematicCamera.Session
             _shotSolver.BeginShot(target, _director.CurrentShot);
             CameraPose initialPose = SolveComposedPose(target, _director.CurrentShot);
             initialPose = _smoother.Reset(initialPose, target.Position);
-            if (!_camera.TryEnterFixed(initialPose, out reason))
+            if (!_camera.TryEnterFixed(initialPose, preferControlledView, out reason))
             {
                 target.Clear();
                 _director.Clear();
@@ -246,10 +275,19 @@ namespace SECinematicCamera.Session
 
             _target.Refresh();
             bool changed;
-            if (_config.Automatic && _shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
+            if (_shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
             {
-                changed = _director.RequestNext(_target,
-                    "Fly-by ended: target receded 700 m from the fixed camera");
+                if (_config.Automatic)
+                {
+                    changed = _director.RequestNext(_target,
+                        "Fly-by ended: target receded 700 m from the fixed camera");
+                }
+                else
+                {
+                    _director.RestartCurrent("Manual fly-by repositioned at 700 m");
+                    ApplyHardCut(_director.LastChangeReason);
+                    return;
+                }
             }
             else
             {

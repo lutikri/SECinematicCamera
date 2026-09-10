@@ -69,6 +69,19 @@ namespace SECinematicCamera.Director
             return ChangeTo(ChooseNext(target), reason);
         }
 
+        public void SelectNextManual()
+        {
+            int index = System.Array.IndexOf(AvailableShots, CurrentShot);
+            ShotType next = AvailableShots[(index + 1 + AvailableShots.Length) % AvailableShots.Length];
+            ChangeTo(next, "Manual hotkey cycle");
+        }
+
+        public void RestartCurrent(string reason)
+        {
+            ShotAgeSeconds = 0f;
+            LastChangeReason = reason;
+        }
+
         public void Clear()
         {
             _history.Clear();

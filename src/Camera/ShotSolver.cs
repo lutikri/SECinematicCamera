@@ -36,6 +36,14 @@ namespace SECinematicCamera.Camera
             if (shot == ShotType.FrontMountedClose || shot == ShotType.RearMountedForward)
                 return SolveMounted(target, shot, lookAhead);
 
+            if (shot == ShotType.WorldLockedFlyBy)
+            {
+                Vector3D flyByPosition = _hasActiveShot && _activeShot == shot
+                    ? _worldLockedPosition
+                    : SolveFlyByPosition(target, up, forward, right);
+                return new CameraPose(flyByPosition, lookAt, up);
+            }
+
             double distance = target.Scale * _config.Distance;
             // Distance is the overall shot scale. Height and side are ratios of it,
             // so lowering distance brings the whole rig closer rather than changing
@@ -52,6 +60,16 @@ namespace SECinematicCamera.Camera
                 position = _worldLockedPosition;
 
             return new CameraPose(position, lookAt, up);
+        }
+
+        private static Vector3D SolveFlyByPosition(CinematicTarget target, Vector3D up,
+            Vector3D forward, Vector3D right)
+        {
+            double placementDistance = System.Math.Max(60.0,
+                System.Math.Min(100.0, target.Scale * 2.25));
+            Vector3D direction = forward * 0.72 + right * 0.48 + up * 0.50;
+            direction.Normalize();
+            return target.Position + direction * placementDistance;
         }
 
         private static CameraPose SolveMounted(CinematicTarget target, ShotType shot,
@@ -127,10 +145,10 @@ namespace SECinematicCamera.Camera
             if (gravity.LengthSquared() > 0.0001f)
             {
                 up = -Vector3D.Normalize(gravity);
-                forward = target.WorldMatrix.Forward -
-                    up * Vector3D.Dot(target.WorldMatrix.Forward, up);
+                forward = target.Controller.WorldMatrix.Forward -
+                    up * Vector3D.Dot(target.Controller.WorldMatrix.Forward, up);
                 if (forward.LengthSquared() < 0.01)
-                    forward = target.WorldMatrix.Up - up * Vector3D.Dot(target.WorldMatrix.Up, up);
+                    forward = target.Controller.WorldMatrix.Up - up * Vector3D.Dot(target.Controller.WorldMatrix.Up, up);
                 if (forward.LengthSquared() < 0.01)
                     forward = Vector3D.CalculatePerpendicularVector(up);
                 forward.Normalize();
@@ -139,9 +157,12 @@ namespace SECinematicCamera.Camera
                 return;
             }
 
-            up = target.WorldMatrix.Up;
-            forward = target.WorldMatrix.Forward;
-            right = target.WorldMatrix.Right;
+            // In zero gravity the occupied controller defines the pilot's real
+            // up/forward frame. A cockpit can be mounted in a grid orientation
+            // that makes the grid axes cinematographically misleading.
+            up = target.Controller.WorldMatrix.Up;
+            forward = target.Controller.WorldMatrix.Forward;
+            right = target.Controller.WorldMatrix.Right;
             if (up.LengthSquared() < 0.5 || forward.LengthSquared() < 0.5 || right.LengthSquared() < 0.5)
             {
                 up = Vector3D.Up;

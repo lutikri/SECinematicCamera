@@ -39,7 +39,8 @@ namespace SECinematicCamera.Camera
             get { return _savedState != null ? _savedState.SpectatorMovement.ToString() : "Unavailable"; }
         }
 
-        public bool TryEnterFixed(CameraPose initialPose, out string reason)
+        public bool TryEnterFixed(CameraPose initialPose, bool preferControlledView,
+            out string reason)
         {
             reason = null;
             if (MyAPIGateway.Session == null || MySpectator.Static == null)
@@ -48,7 +49,7 @@ namespace SECinematicCamera.Camera
                 return false;
             }
 
-            CaptureCurrentState();
+            CaptureCurrentState(preferControlledView);
             try
             {
                 // Set this explicitly. Selecting SpectatorFixed alone does not reliably
@@ -119,13 +120,16 @@ namespace SECinematicCamera.Camera
             return new CameraProjectionInfo(horizontal, vertical);
         }
 
-        public void Restore()
+        public void Restore(bool forceControlledView = false)
         {
             CameraState state = _savedState;
             _savedState = null;
             _expectedController = null;
             if (state == null || MyAPIGateway.Session == null)
                 return;
+
+            if (forceControlledView)
+                PreferControlledView(state);
 
             if (!state.IsSpectator && state.Entity != null && !state.Entity.Closed && !state.Entity.MarkedForClose)
             {
@@ -166,7 +170,7 @@ namespace SECinematicCamera.Camera
                 MySpectator.Static.SpectatorCameraMovement = state.SpectatorMovement;
         }
 
-        private void CaptureCurrentState()
+        private void CaptureCurrentState(bool preferControlledView)
         {
             IMyCameraController controller = MyAPIGateway.Session.CameraController;
             MyEntity entity = controller != null ? controller.Entity : null;
@@ -182,6 +186,26 @@ namespace SECinematicCamera.Camera
                 SpectatorTarget = spectator.Target,
                 SpectatorUp = spectator.Orientation.Up
             };
+
+            if (preferControlledView)
+                PreferControlledView(_savedState);
+        }
+
+        private static void PreferControlledView(CameraState state)
+        {
+            IMyControllableEntity controlled = MyAPIGateway.Session != null
+                ? MyAPIGateway.Session.ControlledObject
+                : null;
+            MyEntity entity = controlled != null ? controlled.Entity as MyEntity : null;
+            if (entity == null || entity.Closed || entity.MarkedForClose)
+                return;
+
+            IMyCameraController cameraController = controlled as IMyCameraController;
+            state.Controller = cameraController;
+            state.Entity = entity;
+            state.IsSpectator = false;
+            if (cameraController != null)
+                state.IsInFirstPerson = cameraController.IsInFirstPersonView;
         }
 
         private static MyCameraControllerEnum ToCameraMode(MySpectatorCameraMovementEnum movement)

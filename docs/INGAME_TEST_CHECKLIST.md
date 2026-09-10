@@ -22,6 +22,9 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Confirm the camera follows smoothly while staying in the same rear-high shot.
 - [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
 - [ ] Repeat from third-person view. Expected: F9 exit restores third-person view.
+- [ ] Activate from first person and press V. Expected: cinematic mode exits to a normal controlled-ship view, not SpectatorFixed.
+- [ ] Repeat from third person and press V. Expected: a normal first/third-person ship camera is active and V continues behaving like the vanilla view key.
+- [ ] While active, press Ctrl+F9 repeatedly. Expected: each press hard-cuts to the next manual profile and automatic selection turns OFF; no Blueprint screen opens.
 - [ ] If spectator mode is available, activate from a spectator view, then exit. Expected: prior spectator position, aim/roll, and movement mode are restored as closely as possible.
 - [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
 
@@ -66,7 +69,10 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] `/cine cam distant` and `/cine cam 9`: DistantTopSide.
 - [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
 - [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
-- [ ] For WorldLockedFlyBy, confirm the camera stays fixed in world space while its aim follows the moving vehicle. With auto ON, it should cut after the receding grid reaches approximately 700 m from the camera.
+- [ ] For WorldLockedFlyBy, confirm the camera is initially placed approximately 60–100 m away, stays fixed in world space, and pans smoothly toward the moving vehicle. Small left/right course corrections must not flip the composition or jerk the pan.
+- [ ] With auto ON, fly-by should cut after the receding grid reaches approximately 700 m. With manual fly-by, it should hard-cut to a newly placed fixed camera instead.
+- [ ] Confirm front mount lasts about 2 seconds and rear mount about 2.5 seconds in automatic mode.
+- [ ] Confirm OverheadDrift lasts about 2.5 seconds in automatic mode.
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
 - [ ] Confirm orbit/overhead shots remain high relative to natural gravity. The two close mounted shots may sit close to the hull, but there should be no wheel-height or ground-level view.
 
@@ -101,7 +107,7 @@ Test these while stationary, moving forward, reversing, and turning:
 
 - [ ] On a planet, drive across slopes and uneven ground. Expected: camera Up remains aligned with natural gravity rather than rolling with the rover.
 - [ ] On a planet, point a ship steeply upward/downward. Expected: camera orientation remains stable and does not flip or produce an invalid view.
-- [ ] In zero gravity, rotate the ship through several orientations. Expected: grid orientation provides a stable fallback and the camera does not produce NaN-like jumps or disappear.
+- [ ] In zero gravity, rotate the ship through several orientations. Expected: the occupied cockpit's orientation defines forward/up, even when the cockpit is mounted sideways relative to the grid; the camera does not flip or disappear.
 - [ ] Repeat every manual profile in both natural gravity and zero gravity.
 
 ## 8. Runtime tuning

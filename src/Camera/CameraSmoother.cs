@@ -16,6 +16,8 @@ namespace SECinematicCamera.Camera
         private Vector3D _aimVelocity;
         private Vector3D _relativeAim;
         private bool _hasAimVelocity;
+        private Vector3D _observedTargetVelocity;
+        private bool _hasObservedVelocity;
 
         public double LastPositionLag { get; private set; }
         public double LastAimLag { get; private set; }
@@ -32,6 +34,8 @@ namespace SECinematicCamera.Camera
             _hasAimVelocity = false;
             _followVelocity = Vector3D.Zero;
             _aimVelocity = Vector3D.Zero;
+            _observedTargetVelocity = Vector3D.Zero;
+            _hasObservedVelocity = false;
             LastPositionLag = 0.0;
             LastAimLag = 0.0;
             return _pose;
@@ -49,6 +53,20 @@ namespace SECinematicCamera.Camera
                 elapsedSeconds, responseScale);
             double aimAmount = DampAmount(profile.AimDampingSeconds,
                 elapsedSeconds, responseScale);
+            if (!_hasObservedVelocity)
+            {
+                _observedTargetVelocity = targetVelocity;
+                _hasObservedVelocity = true;
+            }
+            else
+            {
+                // Deliberately learn target velocity slowly. Feeding raw velocity
+                // into the pursuit spring makes every thruster key transition
+                // feel like a camera command even though it is physically derived.
+                double velocityAmount = DampAmount(1.10, elapsedSeconds, 1.0);
+                _observedTargetVelocity = Vector3D.Lerp(_observedTargetVelocity,
+                    targetVelocity, velocityAmount);
+            }
 
             if (profile.WorldLocked)
             {
@@ -59,7 +77,7 @@ namespace SECinematicCamera.Camera
                 Vector3D desiredOffset = desired.Position - targetAnchor;
                 _relativePosition = Vector3D.Lerp(_relativePosition, desiredOffset, positionAmount);
                 UpdateSpring(ref _followAnchor, ref _followVelocity, ref _hasFollowVelocity,
-                    targetAnchor, targetVelocity, elapsedSeconds,
+                    targetAnchor, _observedTargetVelocity, elapsedSeconds,
                     profile.TranslationFollowSeconds, targetScale * profile.MaximumLagScale);
                 _pose.Position = _followAnchor + _relativePosition;
             }
@@ -71,6 +89,7 @@ namespace SECinematicCamera.Camera
                 _aimAnchor = targetAnchor;
                 _aimVelocity = targetVelocity;
                 _hasAimVelocity = true;
+                _pose.LookAt = SmoothWorldLockedAim(_pose, desired, aimAmount);
             }
             else
             {
@@ -78,10 +97,10 @@ namespace SECinematicCamera.Camera
                     ? 0.0
                     : profile.AimDampingSeconds * 1.5;
                 UpdateSpring(ref _aimAnchor, ref _aimVelocity, ref _hasAimVelocity,
-                    targetAnchor, targetVelocity, elapsedSeconds, aimFollowSeconds,
+                    targetAnchor, _observedTargetVelocity, elapsedSeconds, aimFollowSeconds,
                     targetScale * profile.MaximumLagScale * 0.55);
+                _pose.LookAt = _aimAnchor + _relativeAim;
             }
-            _pose.LookAt = _aimAnchor + _relativeAim;
             _pose.Up = Vector3D.Normalize(Vector3D.Lerp(_pose.Up, desired.Up, aimAmount));
             LastPositionLag = profile.WorldLocked
                 ? 0.0
@@ -90,6 +109,25 @@ namespace SECinematicCamera.Camera
                 ? 0.0
                 : Vector3D.Distance(_aimAnchor, targetAnchor);
             return _pose;
+        }
+
+        private static Vector3D SmoothWorldLockedAim(CameraPose current, CameraPose desired,
+            double amount)
+        {
+            Vector3D currentDirection = current.LookAt - current.Position;
+            Vector3D desiredDirection = desired.LookAt - desired.Position;
+            double desiredDistance = desiredDirection.Length();
+            if (currentDirection.LengthSquared() < 0.001 || desiredDistance < 0.001)
+                return desired.LookAt;
+
+            currentDirection.Normalize();
+            desiredDirection /= desiredDistance;
+            Vector3D direction = Vector3D.Lerp(currentDirection, desiredDirection, amount);
+            if (direction.LengthSquared() < 0.001)
+                direction = desiredDirection;
+            else
+                direction.Normalize();
+            return current.Position + direction * desiredDistance;
         }
 
         public string GetDiagnostics()
@@ -166,6 +204,8 @@ namespace SECinematicCamera.Camera
             _aimVelocity = Vector3D.Zero;
             _relativeAim = Vector3D.Zero;
             _hasAimVelocity = false;
+            _observedTargetVelocity = Vector3D.Zero;
+            _hasObservedVelocity = false;
             LastPositionLag = 0.0;
             LastAimLag = 0.0;
         }
