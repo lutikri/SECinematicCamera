@@ -1,5 +1,6 @@
 using VRageMath;
 using SECinematicCamera.Director;
+using System.Globalization;
 
 namespace SECinematicCamera.Camera
 {
@@ -7,20 +8,32 @@ namespace SECinematicCamera.Camera
     {
         private bool _hasPose;
         private CameraPose _pose;
-        private Vector3D _targetAnchor;
-        private Vector3D _previousVelocity;
-        private Vector3D _filteredAcceleration;
-        private Vector3D _accelerationOffset;
-        private bool _hasVelocity;
+        private Vector3D _followAnchor;
+        private Vector3D _followVelocity;
+        private Vector3D _relativePosition;
+        private bool _hasFollowVelocity;
+        private Vector3D _aimAnchor;
+        private Vector3D _aimVelocity;
+        private Vector3D _relativeAim;
+        private bool _hasAimVelocity;
+
+        public double LastPositionLag { get; private set; }
+        public double LastAimLag { get; private set; }
 
         public CameraPose Reset(CameraPose pose, Vector3D targetAnchor)
         {
             _pose = pose;
-            _targetAnchor = targetAnchor;
+            _followAnchor = targetAnchor;
+            _relativePosition = pose.Position - targetAnchor;
+            _aimAnchor = targetAnchor;
+            _relativeAim = pose.LookAt - targetAnchor;
             _hasPose = true;
-            _hasVelocity = false;
-            _filteredAcceleration = Vector3D.Zero;
-            _accelerationOffset = Vector3D.Zero;
+            _hasFollowVelocity = false;
+            _hasAimVelocity = false;
+            _followVelocity = Vector3D.Zero;
+            _aimVelocity = Vector3D.Zero;
+            LastPositionLag = 0.0;
+            LastAimLag = 0.0;
             return _pose;
         }
 
@@ -37,60 +50,100 @@ namespace SECinematicCamera.Camera
             double aimAmount = DampAmount(profile.AimDampingSeconds,
                 elapsedSeconds, responseScale);
 
-            Vector3D previousAccelerationOffset = _accelerationOffset;
-            UpdateAccelerationOffset(targetVelocity, elapsedSeconds, profile, targetScale);
-
             if (profile.WorldLocked)
             {
                 _pose.Position = desired.Position;
             }
             else
             {
-                Vector3D currentOffset = _pose.Position - _targetAnchor - previousAccelerationOffset;
                 Vector3D desiredOffset = desired.Position - targetAnchor;
-                _pose.Position = targetAnchor +
-                    Vector3D.Lerp(currentOffset, desiredOffset, positionAmount) +
-                    _accelerationOffset;
+                _relativePosition = Vector3D.Lerp(_relativePosition, desiredOffset, positionAmount);
+                UpdateSpring(ref _followAnchor, ref _followVelocity, ref _hasFollowVelocity,
+                    targetAnchor, targetVelocity, elapsedSeconds,
+                    profile.TranslationFollowSeconds, targetScale * profile.MaximumLagScale);
+                _pose.Position = _followAnchor + _relativePosition;
             }
 
-            Vector3D currentAimOffset = _pose.LookAt - _targetAnchor;
             Vector3D desiredAimOffset = desired.LookAt - targetAnchor;
-            _pose.LookAt = targetAnchor + Vector3D.Lerp(currentAimOffset, desiredAimOffset, aimAmount);
+            _relativeAim = Vector3D.Lerp(_relativeAim, desiredAimOffset, aimAmount);
+            if (profile.WorldLocked)
+            {
+                _aimAnchor = targetAnchor;
+                _aimVelocity = targetVelocity;
+                _hasAimVelocity = true;
+            }
+            else
+            {
+                double aimFollowSeconds = profile.TranslationFollowSeconds <= 0.001
+                    ? 0.0
+                    : profile.AimDampingSeconds * 1.5;
+                UpdateSpring(ref _aimAnchor, ref _aimVelocity, ref _hasAimVelocity,
+                    targetAnchor, targetVelocity, elapsedSeconds, aimFollowSeconds,
+                    targetScale * profile.MaximumLagScale * 0.55);
+            }
+            _pose.LookAt = _aimAnchor + _relativeAim;
             _pose.Up = Vector3D.Normalize(Vector3D.Lerp(_pose.Up, desired.Up, aimAmount));
-            _targetAnchor = targetAnchor;
+            LastPositionLag = profile.WorldLocked
+                ? 0.0
+                : Vector3D.Distance(_followAnchor, targetAnchor);
+            LastAimLag = profile.WorldLocked
+                ? 0.0
+                : Vector3D.Distance(_aimAnchor, targetAnchor);
             return _pose;
         }
 
-        private void UpdateAccelerationOffset(Vector3D velocity, double elapsedSeconds,
-            ShotProfile profile, double targetScale)
+        public string GetDiagnostics()
         {
-            if (!_hasVelocity || elapsedSeconds <= 0.0001)
+            return string.Format(CultureInfo.InvariantCulture,
+                "operator lag pos {0:0.00} m, aim {1:0.00} m",
+                LastPositionLag, LastAimLag);
+        }
+
+        private static void UpdateSpring(ref Vector3D position, ref Vector3D velocity,
+            ref bool initialized, Vector3D targetPosition, Vector3D targetVelocity,
+            double elapsedSeconds, double followSeconds, double maximumLag)
+        {
+            if (!initialized || elapsedSeconds <= 0.0001)
             {
-                _previousVelocity = velocity;
-                _hasVelocity = true;
-                _filteredAcceleration = Vector3D.Zero;
-                _accelerationOffset = Vector3D.Zero;
+                position = targetPosition;
+                velocity = targetVelocity;
+                initialized = true;
                 return;
             }
 
-            Vector3D acceleration = (velocity - _previousVelocity) / elapsedSeconds;
-            _previousVelocity = velocity;
-            double maximumAcceleration = 120.0;
-            if (acceleration.LengthSquared() > maximumAcceleration * maximumAcceleration)
-                acceleration = Vector3D.Normalize(acceleration) * maximumAcceleration;
+            if (followSeconds <= 0.001 || maximumLag <= 0.0)
+            {
+                position = targetPosition;
+                velocity = targetVelocity;
+                return;
+            }
 
-            double filterAmount = DampAmount(0.10, elapsedSeconds, 1.0);
-            _filteredAcceleration = Vector3D.Lerp(_filteredAcceleration, acceleration, filterAmount);
-            Vector3D desiredLag = -_filteredAcceleration *
-                profile.AccelerationLagSeconds * profile.AccelerationLagSeconds;
-            double maximumLag = targetScale * profile.MaximumLagScale;
-            if (maximumLag <= 0.0)
-                desiredLag = Vector3D.Zero;
-            else if (desiredLag.LengthSquared() > maximumLag * maximumLag)
-                desiredLag = Vector3D.Normalize(desiredLag) * maximumLag;
+            // Critically damped world-space pursuit. The camera has its own
+            // velocity; it responds to the ship's observed motion, never input.
+            double omega = 2.0 / followSeconds;
+            Vector3D error = targetPosition - position;
+            double normalizedLag = error.Length() / maximumLag;
+            double edge = MathHelper.Clamp((normalizedLag - 0.55) / 0.45, 0.0, 1.0);
+            omega *= 1.0 + edge * edge * 2.0;
+            Vector3D acceleration = error * omega * omega +
+                (targetVelocity - velocity) * (2.0 * omega);
+            velocity += acceleration * elapsedSeconds;
+            position += velocity * elapsedSeconds;
 
-            double lagAmount = DampAmount(0.18, elapsedSeconds, 1.0);
-            _accelerationOffset = Vector3D.Lerp(_accelerationOffset, desiredLag, lagAmount);
+            error = targetPosition - position;
+            if (error.LengthSquared() > maximumLag * maximumLag)
+            {
+                Vector3D direction = Vector3D.Normalize(error);
+                position = targetPosition - direction * maximumLag;
+
+                // At the framing limit, discard only the velocity component
+                // that would increase separation. Tangential camera motion stays.
+                Vector3D relativeVelocity = velocity - targetVelocity;
+                double separatingSpeed = Vector3D.Dot(relativeVelocity, direction);
+                if (separatingSpeed < 0.0)
+                    relativeVelocity -= direction * separatingSpeed;
+                velocity = targetVelocity + relativeVelocity;
+            }
         }
 
         private static double DampAmount(double dampingSeconds, double elapsedSeconds,
@@ -105,11 +158,16 @@ namespace SECinematicCamera.Camera
         {
             _hasPose = false;
             _pose = default(CameraPose);
-            _targetAnchor = Vector3D.Zero;
-            _previousVelocity = Vector3D.Zero;
-            _filteredAcceleration = Vector3D.Zero;
-            _accelerationOffset = Vector3D.Zero;
-            _hasVelocity = false;
+            _followAnchor = Vector3D.Zero;
+            _followVelocity = Vector3D.Zero;
+            _relativePosition = Vector3D.Zero;
+            _hasFollowVelocity = false;
+            _aimAnchor = Vector3D.Zero;
+            _aimVelocity = Vector3D.Zero;
+            _relativeAim = Vector3D.Zero;
+            _hasAimVelocity = false;
+            LastPositionLag = 0.0;
+            LastAimLag = 0.0;
         }
     }
 }

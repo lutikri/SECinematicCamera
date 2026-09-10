@@ -120,7 +120,8 @@ Test these while stationary, moving forward, reversing, and turning:
 
 - [ ] Select `/cine cam rear`, accelerate hard forward/backward and laterally, then stop thrust without braking. Expected: clearly visible but bounded camera yield during acceleration, followed by recovery; constant speed alone must not keep increasing the offset.
 - [ ] In `/cine cam rear`, yaw/pitch/roll the ship with the mouse and roll controls. Expected: the camera orientation follows with visible weight and catches up without losing the ship.
-- [ ] Confirm the subtle follow-camera shake is visible at speed but does not look like spectator input drift.
+- [ ] At 0–10 m/s, confirm there is no procedural camera shake.
+- [ ] Above 10 m/s, confirm shake fades in progressively and does not look like spectator input drift.
 - [ ] Select `/cine cam flyby`. Expected: the camera position stays world-locked and has no procedural shake.
 - [ ] Select `/cine cam frontmount`. Expected: a close camera sits just beyond the nose and looks back across the forward structure; vibration is small and faster than on tracking shots.
 - [ ] Select `/cine cam rearmount`. Expected: a close camera sits just behind/above the tail and looks forward along the ship; vibration is small and fast.

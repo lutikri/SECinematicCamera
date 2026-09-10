@@ -139,10 +139,10 @@ namespace SECinematicCamera.Session
                 return "OFF; auto " + (_config.Automatic ? "ON" : "OFF") + ".";
 
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}; {6}",
+                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}; {6}; {7}",
                 _target.Grid.DisplayName, _director.CurrentShot, _director.ShotAgeSeconds,
                 _director.CurrentDurationSeconds, _target.Speed, _director.LastChangeReason,
-                _screenComposer.GetDiagnostics());
+                _screenComposer.GetDiagnostics(), _smoother.GetDiagnostics());
         }
 
         public string GetSettings()

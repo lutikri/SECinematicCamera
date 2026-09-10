@@ -25,7 +25,11 @@ namespace SECinematicCamera.Camera
             Vector3D up = Vector3D.Cross(right, forward);
             up.Normalize();
 
-            double speedGain = MathHelper.Clamp(0.35 + target.Speed / 110.0, 0.35, 1.35);
+            // No shake while stationary or maneuvering slowly. Fade it in above
+            // 10 m/s rather than popping at the threshold.
+            double speedGain = MathHelper.Clamp((target.Speed - 10.0) / 70.0, 0.0, 1.35);
+            if (speedGain <= 0.0)
+                return pose;
             double time = shotAgeSeconds * profile.ShakeFrequency;
             double yaw = LayeredWave(time, 0.17, 1.00, 2.37);
             double pitch = LayeredWave(time + 3.1, 0.13, 1.31, 2.83);

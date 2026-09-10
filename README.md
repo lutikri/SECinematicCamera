@@ -77,8 +77,8 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
 - Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
 - Gives ordinary tracking rigs separate position and aim damping. Rotation changes therefore have camera weight instead of rigidly copying the grid orientation.
-- Adds bounded acceleration-only displacement to tracking shots. The camera yields while thrust changes velocity but does not accumulate a speed-proportional offset that can lose the ship.
-- Applies subtle multi-frequency positional/rotational shake after tracking is solved, so shake never feeds back into damping. Mounted shots use a faster vibration profile; fly-by and distant establishing shots deliberately have no shake.
+- Gives each free tracking rig its own critically damped world-space pursuit. Camera position and aim have separate velocities: the ship can move through the frame while accelerating, then the virtual operator smoothly matches its motion. A soft boundary increases pursuit near the framing limit and a hard bound prevents losing the ship. Mounted cameras remain rigid and fly-by remains world-locked.
+- Applies subtle multi-frequency positional/rotational shake only above 10 m/s and after tracking is solved, so shake never feeds back into damping. Mounted shots use a faster vibration profile; fly-by and distant establishing shots deliberately have no shake.
 - Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
 - Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
 - Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
