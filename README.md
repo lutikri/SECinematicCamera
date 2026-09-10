@@ -66,7 +66,9 @@ The clean bootstrap and completed V0 builds both successfully resolved `D:\Progr
 
 Handled `/cine` commands remain local and are not sent to chat or the server.
 
-Safe tuning ranges are: duration 1–60 seconds, distance 0.5–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
+Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1–10, side 0–10, smoothing 0.01–1, and lookahead 0–5 seconds. Runtime changes are not persisted. Selecting a manual camera disables automatic changes until `/cine auto on` is used.
+
+`distance` is the overall vehicle-size-relative shot scale; `height` and `side` are ratios of that distance. The compiled defaults are distance `0.5`, height `1.2`, side `1.1`, smoothing `0.16`, and lookahead `0.05`. Look-ahead is capped to 15% of the vehicle scale so speed alone cannot move the ship near the edge of the frame.
 
 ## V0 behavior
 
@@ -74,6 +76,7 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.5–20, height 0.1�
 - Switches the camera to `SpectatorFixed` without releasing ship control.
 - Explicitly sets spectator movement to `None` before and after activation and before every pose write, preventing ship-control input from also flying the spectator camera.
 - Writes an absolute world-space spectator position and target every cinematic update; it never accumulates camera movement deltas.
+- Compensates target translation before smoothing, so acceleration does not create a spring-like camera lag. Position smoothing affects the camera's relative shot offset instead of trailing the grid in world space.
 - Restores the prior entity camera on exit or emergency shutdown.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and grid orientation as a zero-gravity fallback.

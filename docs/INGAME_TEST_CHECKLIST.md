@@ -36,6 +36,8 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Move the mouse enough to command ship gyros. Expected: the ship rotates; mouse input does not leave the cinematic camera in a user-rotated pose.
 - [ ] Test both roll directions. Expected: the ship rolls; the camera continues using its gravity-relative or grid-relative solved orientation.
 - [ ] Combine translation, mouse/gyro, and roll controls for at least 15 seconds. Expected: no accumulating camera offset or rotation.
+- [ ] Accelerate from 0 to maximum speed in a straight line. Expected: the camera does not spring behind and the ship remains framed near its intended screen position.
+- [ ] Release thrust at maximum speed and decelerate. Expected: there is no large catch-up movement from the camera.
 - [ ] Turn cinematic mode OFF. Expected: the prior camera controller and the spectator movement mode captured at activation are restored.
 - [ ] Repeat activation from each available spectator movement mode. Expected: cinematic mode always uses `None`, and shutdown restores the prior mode.
 
@@ -88,11 +90,11 @@ Test these while stationary, moving forward, reversing, and turning:
 ## 8. Runtime tuning
 
 - [ ] Test `/cine set duration 5.0`; verify `/cine get` reports the change and automatic timing follows it.
-- [ ] Test `/cine set distance 3.4`; expected: camera distance changes without a shot transition.
+- [ ] Test `/cine set distance 0.5`, then `0.3`; expected: the entire camera rig moves closer, including its height and side offsets, without a shot transition.
 - [ ] Test `/cine set height 1.2`; expected: camera height changes.
 - [ ] Test `/cine set side 1.1`; expected: three-quarter/side bias changes.
 - [ ] Test `/cine set smoothing 0.05`, then `0.5`; expected: within-shot following changes from slower to faster without smoothing between cuts.
-- [ ] Test `/cine set lookahead 0`, then `1`; expected: aim lead visibly changes while moving.
+- [ ] Test `/cine set lookahead 0`, then `1`; expected: aim lead visibly changes while moving but remains capped so the ship stays safely framed at high speed.
 - [ ] Test values just inside and outside every documented safe range. Expected: valid values apply; invalid values are rejected cleanly.
 - [ ] Run `/cine reset`. Expected: all values return to compiled defaults, automatic mode turns ON, and debug mode turns OFF.
 - [ ] Reload the world after changing values. Expected: V0 runtime tuning is not persisted.

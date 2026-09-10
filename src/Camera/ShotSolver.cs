@@ -25,10 +25,18 @@ namespace SECinematicCamera.Camera
             Vector3D forward;
             Vector3D right;
             ResolveFrame(target, out up, out forward, out right);
-            Vector3D lookAt = target.Position + (Vector3D)target.LinearVelocity * _config.LookAheadSeconds;
+            Vector3D lookAhead = (Vector3D)target.LinearVelocity * _config.LookAheadSeconds;
+            double maximumLookAhead = System.Math.Max(0.5, target.Scale * 0.15);
+            if (lookAhead.LengthSquared() > maximumLookAhead * maximumLookAhead)
+                lookAhead = Vector3D.Normalize(lookAhead) * maximumLookAhead;
+
+            Vector3D lookAt = target.Position + lookAhead;
             double distance = target.Scale * _config.Distance;
-            double height = target.Scale * _config.Height;
-            double side = target.Scale * _config.Side;
+            // Distance is the overall shot scale. Height and side are ratios of it,
+            // so lowering distance brings the whole rig closer rather than changing
+            // only its fore/aft component.
+            double height = distance * _config.Height;
+            double side = distance * _config.Side;
 
             Vector3D position = target.Position +
                 forward * distance * profile.ForwardDistance +

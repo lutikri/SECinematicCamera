@@ -141,7 +141,7 @@ namespace SECinematicCamera.Input
                     if (valid) _config.ShotDurationSeconds = (float)value;
                     break;
                 case "distance":
-                    valid = value >= 0.5 && value <= 20.0;
+                    valid = value >= 0.1 && value <= 20.0;
                     if (valid) _config.Distance = value;
                     break;
                 case "height":

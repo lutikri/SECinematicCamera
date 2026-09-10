@@ -208,7 +208,7 @@ namespace SECinematicCamera.Session
             _director.Reset(target);
             _shotSolver.BeginShot(target, _director.CurrentShot);
             CameraPose initialPose = _shotSolver.Solve(target, _director.CurrentShot);
-            initialPose = _smoother.Reset(initialPose);
+            initialPose = _smoother.Reset(initialPose, target.Position);
             if (!_camera.TryEnterFixed(initialPose, out reason))
             {
                 target.Clear();
@@ -247,13 +247,14 @@ namespace SECinematicCamera.Session
             {
                 _shotSolver.BeginShot(_target, _director.CurrentShot);
                 desired = _shotSolver.Solve(_target, _director.CurrentShot);
-                pose = _smoother.Reset(desired);
+                pose = _smoother.Reset(desired, _target.Position);
                 _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name +
                     " — " + _director.LastChangeReason + ".");
             }
             else
             {
-                pose = _smoother.Step(desired, _config.Smoothing);
+                pose = _smoother.Step(desired, _target.Position, _config.Smoothing,
+                    ShotProfile.Get(_director.CurrentShot).WorldLocked);
             }
             _camera.ApplyPose(pose);
             UpdateSpectatorInputDiagnostics();
@@ -325,7 +326,8 @@ namespace SECinematicCamera.Session
         {
             _target.Refresh();
             _shotSolver.BeginShot(_target, _director.CurrentShot);
-            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, _director.CurrentShot));
+            CameraPose pose = _smoother.Reset(_shotSolver.Solve(_target, _director.CurrentShot),
+                _target.Position);
             _camera.ApplyPose(pose);
             _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name + " — " + reason + ".");
         }
