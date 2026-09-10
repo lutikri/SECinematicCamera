@@ -22,6 +22,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Confirm the camera follows smoothly while staying in the same rear-high shot.
 - [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
 - [ ] Repeat from third-person view. Expected: F9 exit restores third-person view.
+- [ ] After that third-person restoration, press V twice. Expected: the same controlled cockpit cleanly changes third → first → third; the view must not remain visually stuck inside the cockpit.
 - [ ] Activate from first person and press V. Expected: cinematic mode exits to a normal controlled-ship view, not SpectatorFixed.
 - [ ] Repeat from third person and press V. Expected: a normal first/third-person ship camera is active and V continues behaving like the vanilla view key.
 - [ ] While active, press Ctrl+F9 repeatedly. Expected: each press hard-cuts to the next manual profile and automatic selection turns OFF; no Blueprint screen opens.

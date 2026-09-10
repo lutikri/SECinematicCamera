@@ -133,10 +133,14 @@ namespace SECinematicCamera.Camera
 
             if (!state.IsSpectator && state.Entity != null && !state.Entity.Closed && !state.Entity.MarkedForClose)
             {
-                MyCameraControllerEnum mode = state.IsInFirstPerson
-                    ? MyCameraControllerEnum.Entity
-                    : MyCameraControllerEnum.ThirdPersonSpectator;
-                MyAPIGateway.Session.SetCameraController(mode, state.Entity);
+                // Keep the controlled entity/cockpit as the actual controller in
+                // both view modes. Third-person is a state of that controller;
+                // selecting ThirdPersonSpectator here leaves V toggling the
+                // cockpit while a spectator-style controller still owns output.
+                IMyCameraController entityCamera = state.Entity as IMyCameraController;
+                if (entityCamera != null)
+                    entityCamera.IsInFirstPersonView = state.IsInFirstPerson;
+                MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity, state.Entity);
                 if (MyAPIGateway.Session.CameraController != null)
                     MyAPIGateway.Session.CameraController.IsInFirstPersonView = state.IsInFirstPerson;
                 RestoreSpectatorMovement(state);

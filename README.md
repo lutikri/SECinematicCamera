@@ -85,7 +85,7 @@ Safe tuning ranges are: duration 1–60 seconds, distance 0.1–20, height 0.1�
 - Separates the follow anchor from the point of interest: profiles can favor the nose, upper structure, cockpit, or bounded motion lead instead of always aiming at grid center.
 - Composes the point of interest away from screen center using profile-specific thirds/lead-room rules.
 - Uses the grid's oriented local bounding box and current camera projection to keep ordinary tracking shots inside 5% screen margins. This framing correction is not collision handling.
-- Restores the prior entity camera on exit or emergency shutdown.
+- Restores the controlled cockpit/entity as the actual camera owner on exit or emergency shutdown, with its saved first/third-person flag. This keeps subsequent vanilla V switching functional instead of leaving a spectator-style controller active.
 - F9 activation explicitly remembers the controlled cockpit view even though vanilla also binds F9 to SpectatorFixed. This prevents the vanilla F9 action from being mistaken for the view that must be restored.
 - Uses hard cuts between shots; smoothing applies only while following within one shot.
 - Uses natural gravity for stable Up on planets and the occupied cockpit/controller orientation as the authoritative zero-gravity frame.
