@@ -1,4 +1,7 @@
-# SECinematicCamera
+# CineCam — Automatic Camera Director
+
+[![Steam Workshop](https://img.shields.io/badge/Steam_Workshop-Subscribe-1b2838?logo=steam&logoColor=white)](https://steamcommunity.com/sharedfiles/filedetails/?id=3802777032)
+[![Source](https://img.shields.io/badge/GitHub-Source-181717?logo=github)](https://github.com/lutikri/SECinematicCamera)
 
 Space Engineers has excellent ships, planets, and enormous empty spaces—but no automatic cinematic camera for simply enjoying a flight.
 
@@ -94,13 +97,17 @@ Manual mode lasts only until cinematic mode is switched off. Every fresh `F9` or
 
 ## Installation for players
 
-Until a Workshop release is available, build the project locally or copy a packaged mod into:
+1. [Subscribe on Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3802777032).
+2. Add **CineCam — Automatic Camera Director** to the world's mod list.
+3. Load the world, occupy a ship or rover controller, and press `F9`.
+
+To install a development build instead, build the project locally or copy a packaged mod into:
 
 ```text
 %APPDATA%\SpaceEngineers\Mods\SECinematicCamera
 ```
 
-Enable `SECinematicCamera` in the world's mod list, load the world, occupy a ship or rover controller, and press `F9`.
+The local development version appears in the mod list as `SECinematicCamera`.
 
 ## Building from source
 
@@ -155,6 +162,7 @@ Space Engineers camera-controller and spectator access is deliberately isolated 
 - [x] Manual camera selection and runtime tuning commands
 - [x] Gravity-relative planetary framing and cockpit-relative zero-G framing
 - [x] MDK2 build, whitelist analysis, and local deployment
+- [x] Steam Workshop release
 - [ ] Continue tuning each camera independently for ships and rovers of very different sizes
 - [ ] Improve director pacing and selection weights from longer playtests
 - [ ] Complete in-game regression testing across first person, third person, seat changes, death, and world unload
