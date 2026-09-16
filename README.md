@@ -35,8 +35,8 @@ The current shot set includes:
 | Front High Three-Quarter | Forward-facing tracking shot |
 | Overhead Drift | Short top-down establishing view |
 | World-Locked Fly-By | Fixed camera that pans as the ship passes |
-| Front Mounted Close | Short outward-facing action camera near the front of the ship |
-| Rear Mounted Forward | Short rear camera looking forward along the cockpit axis |
+| Front Mounted Close | Short right-side body camera at the cockpit's longitudinal position |
+| Rear Mounted Forward | Short rear-left corner camera looking forward along the cockpit axis |
 | Distant Top-Side | Extremely wide, slow establishing view with heavy position and rotation inertia |
 
 ## How the system works

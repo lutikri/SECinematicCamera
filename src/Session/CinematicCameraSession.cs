@@ -274,6 +274,12 @@ namespace SECinematicCamera.Session
             CinematicTarget target;
             if (!_targetResolver.TryResolve(out target, out reason))
             {
+                // F9 is also Space Engineers' vanilla spectator key. When the
+                // player is on foot, vanilla may switch to free camera before
+                // this mod rejects the missing ship target. Undo that camera
+                // change only for the hotkey path; chat commands do not cause it.
+                if (preferControlledView)
+                    _camera.RestoreCurrentControlledFirstPerson();
                 _logger.Info(reason);
                 return;
             }

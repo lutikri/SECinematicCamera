@@ -9,7 +9,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Add `SECinematicCamera` to the test world's active mod list.
 - [ ] Load the world without a mod compile error or crash.
 - [ ] Confirm there are no `SECinematicCamera` script errors in `SpaceEngineers.log`.
-- [ ] While on foot, press F9. Expected: cinematic mode does not start and a concise message says to control a ship or rover first.
+- [ ] While on foot in first or third person, press F9. Expected: cinematic mode does not start, vanilla spectator/free camera is immediately cancelled, the character ends in first person, and a concise message says to control a ship or rover first.
 - [ ] Enter a cockpit or remote control attached to a valid grid.
 - [ ] Run `/cine status`. Expected: `OFF | next start: AUTO`.
 - [ ] Run `/cine get`. Expected: the compiled runtime settings are shown.
@@ -130,8 +130,8 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] At 0–10 m/s, confirm there is no procedural camera shake.
 - [ ] Above 10 m/s, confirm shake fades in progressively and does not look like spectator input drift.
 - [ ] Select `/cine cam flyby`. Expected: the camera position stays world-locked and has no procedural shake.
-- [ ] Select `/cine cam frontmount`. Expected: a close camera sits beyond the cockpit-relative front and looks straight forward, never back at the cockpit/grid center; vibration is small, fast, and local to the camera.
-- [ ] Select `/cine cam rearmount`. Expected: a close camera sits behind the cockpit-relative rear and looks straight forward along the ship; vibration is small, fast, and local to the camera.
+- [ ] Select `/cine cam frontmount`. Expected: a close camera sits just outside the rightmost hull surface at the cockpit's longitudinal/vertical station and looks straight forward; vibration is small, fast, and local to the camera.
+- [ ] Select `/cine cam rearmount`. Expected: a close camera sits outside the rear-left corner, slightly raised, and looks straight forward along the ship; vibration is small, fast, and local to the camera.
 - [ ] Select `/cine cam distant`. Expected: an extremely wide view about five times farther than before makes the ship very small against the world, permits broad movement within frame, barely reacts to brief mouse turns, and has no shake.
 - [ ] Test both mounted cameras on unusually shaped grids. They intentionally do not force the whole bounding box onscreen; note any placement inside blocks for later mount-clearance tuning.
 

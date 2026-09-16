@@ -75,7 +75,6 @@ namespace SECinematicCamera.Camera
         private static CameraPose SolveMounted(CinematicTarget target, ShotType shot)
         {
             FramingTarget framing = target.Framing;
-            double clearance = System.Math.Max(target.Grid.GridSize * 0.75, target.Scale * 0.025);
             Vector3D viewForward = target.Controller.WorldMatrix.Forward;
             Vector3D viewUp = target.Controller.WorldMatrix.Up;
             Vector3D viewRight = target.Controller.WorldMatrix.Right;
@@ -83,26 +82,48 @@ namespace SECinematicCamera.Camera
             viewUp.Normalize();
             viewRight.Normalize();
 
-            // Find the OBB support distance along the cockpit's forward axis.
-            // This makes "front" and "rear" match the pilot's orientation even
-            // when the cockpit is mounted differently from the grid axes.
-            double support = System.Math.Abs(Vector3D.Dot(viewForward, framing.Forward)) * framing.HalfLength +
+            // Project the grid OBB onto the cockpit frame. This gives stable
+            // outer surfaces for arbitrary cockpit mounting without scanning
+            // individual blocks or adding collision queries.
+            double forwardSupport = System.Math.Abs(Vector3D.Dot(viewForward, framing.Forward)) * framing.HalfLength +
                 System.Math.Abs(Vector3D.Dot(viewForward, framing.Up)) * framing.HalfHeight +
                 System.Math.Abs(Vector3D.Dot(viewForward, framing.Right)) * framing.HalfWidth;
+            double rightSupport = System.Math.Abs(Vector3D.Dot(viewRight, framing.Forward)) * framing.HalfLength +
+                System.Math.Abs(Vector3D.Dot(viewRight, framing.Up)) * framing.HalfHeight +
+                System.Math.Abs(Vector3D.Dot(viewRight, framing.Right)) * framing.HalfWidth;
+            double upSupport = System.Math.Abs(Vector3D.Dot(viewUp, framing.Forward)) * framing.HalfLength +
+                System.Math.Abs(Vector3D.Dot(viewUp, framing.Up)) * framing.HalfHeight +
+                System.Math.Abs(Vector3D.Dot(viewUp, framing.Right)) * framing.HalfWidth;
+            double outwardOffset = System.Math.Max(target.Grid.GridSize * 1.25, target.Scale * 0.035);
+            double verticalOffset = System.Math.Max(target.Grid.GridSize * 0.35, target.Scale * 0.008);
             double focusDistance = System.Math.Max(50.0, target.Scale * 4.0);
             Vector3D position;
 
             if (shot == ShotType.FrontMountedClose)
             {
-                position = framing.Center + viewForward * (support + clearance) +
-                    viewUp * framing.HalfHeight * 0.35 +
-                    viewRight * framing.HalfWidth * 0.18;
+                // Right-side body mount at the cockpit's longitudinal/vertical
+                // station. The camera sits just outside the rightmost OBB surface
+                // and looks straight forward along the pilot's view axis.
+                Vector3D cockpitRelative = framing.Cockpit - framing.Center;
+                double cockpitForward = MathHelper.Clamp(
+                    Vector3D.Dot(cockpitRelative, viewForward),
+                    -forwardSupport * 0.80, forwardSupport * 0.80);
+                double cockpitUp = MathHelper.Clamp(
+                    Vector3D.Dot(cockpitRelative, viewUp),
+                    -upSupport * 0.75, upSupport * 0.75);
+                position = framing.Center +
+                    viewForward * cockpitForward +
+                    viewUp * (cockpitUp + verticalOffset) +
+                    viewRight * (rightSupport + outwardOffset);
             }
             else
             {
-                position = framing.Center - viewForward * (support + clearance) +
-                    viewUp * framing.HalfHeight * 0.40 -
-                    viewRight * framing.HalfWidth * 0.15;
+                // Rear-left corner mount: beyond both the tail and left hull
+                // surfaces, lifted slightly so the nearby hull reads clearly.
+                position = framing.Center -
+                    viewForward * (forwardSupport + outwardOffset * 0.70) -
+                    viewRight * (rightSupport + outwardOffset) +
+                    viewUp * (upSupport * 0.18 + verticalOffset);
             }
 
             // Mounted cameras look parallel to the cockpit forward direction.

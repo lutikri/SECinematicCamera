@@ -160,6 +160,11 @@ namespace SECinematicCamera.Camera
             return camera != null && camera.Entity != null;
         }
 
+        public bool RestoreCurrentControlledFirstPerson()
+        {
+            return TrySetEntityFirstPerson(GetCurrentControlledEntity());
+        }
+
         public void ClearTransientState()
         {
             _expectedController = null;
