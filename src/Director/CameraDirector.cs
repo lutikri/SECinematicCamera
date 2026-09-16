@@ -29,7 +29,14 @@ namespace SECinematicCamera.Director
         public string LastChangeReason { get; private set; }
         public float CurrentDurationSeconds
         {
-            get { return _config.ShotDurationSeconds * (float)ShotProfile.Get(CurrentShot).DurationScale; }
+            get
+            {
+                float duration = _config.ShotDurationSeconds *
+                    (float)ShotProfile.Get(CurrentShot).DurationScale;
+                return CurrentShot == ShotType.WorldLockedFlyBy
+                    ? System.Math.Min(6f, duration)
+                    : duration;
+            }
         }
 
         public CameraDirector(CinematicConfig config)

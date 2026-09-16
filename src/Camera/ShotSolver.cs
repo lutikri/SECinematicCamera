@@ -34,7 +34,7 @@ namespace SECinematicCamera.Camera
             Vector3D lookAt = target.Position + lookAhead;
 
             if (shot == ShotType.FrontMountedClose || shot == ShotType.RearMountedForward)
-                return SolveMounted(target, shot, lookAhead);
+                return SolveMounted(target, shot);
 
             if (shot == ShotType.WorldLockedFlyBy)
             {
@@ -72,32 +72,42 @@ namespace SECinematicCamera.Camera
             return target.Position + direction * placementDistance;
         }
 
-        private static CameraPose SolveMounted(CinematicTarget target, ShotType shot,
-            Vector3D lookAhead)
+        private static CameraPose SolveMounted(CinematicTarget target, ShotType shot)
         {
             FramingTarget framing = target.Framing;
             double clearance = System.Math.Max(target.Grid.GridSize * 0.75, target.Scale * 0.025);
+            Vector3D viewForward = target.Controller.WorldMatrix.Forward;
+            Vector3D viewUp = target.Controller.WorldMatrix.Up;
+            Vector3D viewRight = target.Controller.WorldMatrix.Right;
+            viewForward.Normalize();
+            viewUp.Normalize();
+            viewRight.Normalize();
+
+            // Find the OBB support distance along the cockpit's forward axis.
+            // This makes "front" and "rear" match the pilot's orientation even
+            // when the cockpit is mounted differently from the grid axes.
+            double support = System.Math.Abs(Vector3D.Dot(viewForward, framing.Forward)) * framing.HalfLength +
+                System.Math.Abs(Vector3D.Dot(viewForward, framing.Up)) * framing.HalfHeight +
+                System.Math.Abs(Vector3D.Dot(viewForward, framing.Right)) * framing.HalfWidth;
+            double focusDistance = System.Math.Max(50.0, target.Scale * 4.0);
             Vector3D position;
-            Vector3D lookAt;
 
             if (shot == ShotType.FrontMountedClose)
             {
-                position = framing.Nose + framing.Forward * clearance +
-                    framing.Up * framing.HalfHeight * 0.55 +
-                    framing.Right * framing.HalfWidth * 0.22;
-                lookAt = framing.Center + framing.Forward * framing.HalfLength * 0.05 +
-                    framing.Up * framing.HalfHeight * 0.12 + lookAhead * 0.15;
+                position = framing.Center + viewForward * (support + clearance) +
+                    viewUp * framing.HalfHeight * 0.35 +
+                    viewRight * framing.HalfWidth * 0.18;
             }
             else
             {
-                position = framing.Tail - framing.Forward * clearance +
-                    framing.Up * framing.HalfHeight * 0.58 -
-                    framing.Right * framing.HalfWidth * 0.18;
-                lookAt = framing.Nose + framing.Up * framing.HalfHeight * 0.08 +
-                    lookAhead * 0.15;
+                position = framing.Center - viewForward * (support + clearance) +
+                    viewUp * framing.HalfHeight * 0.40 -
+                    viewRight * framing.HalfWidth * 0.15;
             }
 
-            return new CameraPose(position, lookAt, framing.Up);
+            // Mounted cameras look parallel to the cockpit forward direction.
+            // They never aim back at the cockpit or grid center.
+            return new CameraPose(position, position + viewForward * focusDistance, viewUp);
         }
 
         public void BeginShot(CinematicTarget target, ShotType shot)

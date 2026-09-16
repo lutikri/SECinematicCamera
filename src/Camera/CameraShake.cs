@@ -36,15 +36,20 @@ namespace SECinematicCamera.Camera
             double roll = LayeredWave(time + 7.4, 0.11, 0.83, 3.17);
             double angle = MathHelper.ToRadians((float)(profile.ShakeAngleDegrees * speedGain));
 
-            Vector3D shakenLookAt = pose.LookAt +
-                right * yaw * angle * focusDistance +
-                up * pitch * angle * focusDistance;
             Vector3D shakenUp = Vector3D.Normalize(up + right * roll * angle * 0.7);
 
             double positionAmplitude = target.Scale * profile.ShakePositionScale * speedGain;
             Vector3D shakenPosition = pose.Position +
                 right * LayeredWave(time + 1.7, 0.23, 1.19, 2.11) * positionAmplitude +
                 up * LayeredWave(time + 5.3, 0.19, 0.97, 2.71) * positionAmplitude * 0.7;
+
+            // Shake the camera body and its local viewing direction together.
+            // Offsetting the old world-space LookAt while moving Position makes
+            // the camera appear to orbit around its subject, which is especially
+            // wrong for rigid mounted cameras.
+            Vector3D shakenForward = forward + right * yaw * angle + up * pitch * angle;
+            shakenForward.Normalize();
+            Vector3D shakenLookAt = shakenPosition + shakenForward * focusDistance;
             return new CameraPose(shakenPosition, shakenLookAt, shakenUp);
         }
 

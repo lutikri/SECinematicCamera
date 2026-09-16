@@ -17,12 +17,12 @@ Click the image to open the 27-second MP4 demo.
 - Automatically selects shots using shot duration, recent shot history, speed, angular motion, and left/right continuity.
 - Uses hard cuts between cameras—there is no artificial flight from one camera position to the next.
 - Smooths position and aim *inside* a tracking shot, allowing the ship to move naturally within the frame during acceleration and rotation.
-- Keeps mounted shots short and rigid, with a subtle high-speed vibration.
-- Places fly-by cameras in world space and lets the ship pass them instead of attaching the camera to the grid.
+- Keeps mounted shots short and rigid, aims them parallel to the occupied cockpit's forward axis, and adds a subtle camera-local high-speed vibration.
+- Places fly-by cameras in world space and lets the ship pass them instead of attaching the camera to the grid; each fly-by is capped at six seconds.
 - Uses natural gravity as camera Up on planets and the occupied cockpit/controller orientation in zero gravity.
 - Keeps ordinary tracking shots inside safe screen margins while still allowing cinematic composition and lead room.
 - Preserves ship controls while cinematic mode is active.
-- Restores the original cockpit/third-person camera safely when cinematic mode ends.
+- Uses a deterministic first-person fallback when cinematic mode ends, preventing stale cockpit or spectator ownership after seat changes and world unload.
 
 The current shot set includes:
 
@@ -33,9 +33,9 @@ The current shot set includes:
 | Front High Three-Quarter | Forward-facing tracking shot |
 | Overhead Drift | Short top-down establishing view |
 | World-Locked Fly-By | Fixed camera that pans as the ship passes |
-| Front Mounted Close | Short action-camera view near the front of the ship |
-| Rear Mounted Forward | Short rear-mounted view looking along the ship |
-| Distant Top-Side | Long, slow establishing view that emphasizes the surrounding world |
+| Front Mounted Close | Short outward-facing action camera near the front of the ship |
+| Rear Mounted Forward | Short rear camera looking forward along the cockpit axis |
+| Distant Top-Side | Extremely wide, slow establishing view with heavy position and rotation inertia |
 
 ## How the system works
 
@@ -87,6 +87,8 @@ Runtime tuning:
 `distance` is relative to the vehicle size; `height` and `side` are ratios of that distance. Runtime tuning is not persisted yet. Use `/cine get` to view current values and `/cine reset` to restore the compiled defaults.
 
 Other commands: `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, and `/cine help`. Handled `/cine` commands stay local and are not sent to chat or the server.
+
+Manual mode lasts only until cinematic mode is switched off. Every fresh `F9` or `/cine on` activation starts clearly in `AUTO` mode. Exiting cinematic mode always selects the currently controlled entity's first-person camera; the normal `V` key can then switch views as usual.
 
 ## Installation for players
 

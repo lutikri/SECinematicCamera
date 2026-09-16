@@ -11,7 +11,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Confirm there are no `SECinematicCamera` script errors in `SpaceEngineers.log`.
 - [ ] While on foot, press F9. Expected: cinematic mode does not start and a concise message says to control a ship or rover first.
 - [ ] Enter a cockpit or remote control attached to a valid grid.
-- [ ] Run `/cine status`. Expected: `OFF`, with the current automatic-mode state.
+- [ ] Run `/cine status`. Expected: `OFF | next start: AUTO`.
 - [ ] Run `/cine get`. Expected: the compiled runtime settings are shown.
 
 ## 2. First milestone: activation and restoration
@@ -21,12 +21,12 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] While cinematic mode is active, steer, accelerate, brake, roll, and use normal ship/rover controls. Expected: the vehicle remains fully controllable.
 - [ ] Confirm the camera follows smoothly while staying in the same rear-high shot.
 - [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
-- [ ] Repeat from third-person view. Expected: F9 exit restores third-person view.
-- [ ] After that third-person restoration, press V twice. Expected: the same controlled cockpit cleanly changes third → first → third; the view must not remain visually stuck inside the cockpit.
-- [ ] Activate from first person and press V. Expected: cinematic mode exits to a normal controlled-ship view, not SpectatorFixed.
-- [ ] Repeat from third person and press V. Expected: a normal first/third-person ship camera is active and V continues behaving like the vanilla view key.
+- [ ] Repeat from third-person view. Expected: F9 exit deliberately falls back to first-person cockpit view.
+- [ ] After that first-person fallback, press V twice. Expected: the same controlled cockpit cleanly changes first → third → first; it must not remain in SpectatorFixed or jump to another cockpit.
+- [ ] Activate from first person and press V. Expected: cinematic mode exits to the current controlled entity's first-person camera, not SpectatorFixed.
+- [ ] Repeat from third person and press V. Expected: first-person fallback is active and subsequent V presses behave normally.
 - [ ] While active, press Ctrl+F9 repeatedly. Expected: each press hard-cuts to the next manual profile and automatic selection turns OFF; no Blueprint screen opens.
-- [ ] If spectator mode is available, activate from a spectator view, then exit. Expected: prior spectator position, aim/roll, and movement mode are restored as closely as possible.
+- [ ] If a saved world loads into spectator while a cockpit is still controlled, expected: startup recovery immediately selects that cockpit in first person.
 - [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
 
 ## 3. Spectator input-isolation regression
@@ -42,8 +42,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Combine translation, mouse/gyro, and roll controls for at least 15 seconds. Expected: no accumulating camera offset or rotation.
 - [ ] Accelerate from 0 to maximum speed in a straight line. Expected: the camera does not spring behind and the ship remains framed near its intended screen position.
 - [ ] Release thrust at maximum speed and decelerate. Expected: there is no large catch-up movement from the camera.
-- [ ] Turn cinematic mode OFF. Expected: the prior camera controller and the spectator movement mode captured at activation are restored.
-- [ ] Repeat activation from each available spectator movement mode. Expected: cinematic mode always uses `None`, and shutdown restores the prior mode.
+- [ ] Turn cinematic mode OFF. Expected: the current controlled entity owns a first-person camera and spectator movement no longer affects it.
 
 ## 4. Chat command handling
 
@@ -71,10 +70,11 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
 - [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
 - [ ] For WorldLockedFlyBy, confirm the camera is initially placed approximately 60–100 m away, stays fixed in world space, and pans smoothly toward the moving vehicle. Small left/right course corrections must not flip the composition or jerk the pan.
-- [ ] With auto ON, fly-by should cut after the receding grid reaches approximately 700 m. With manual fly-by, it should hard-cut to a newly placed fixed camera instead.
+- [ ] With auto ON, fly-by should cut at six seconds or when the receding grid reaches approximately 700 m, whichever happens first. Manual fly-by should hard-cut to a newly placed fixed camera at the same limits.
 - [ ] Confirm front mount lasts about 2 seconds and rear mount about 2.5 seconds in automatic mode.
 - [ ] Confirm OverheadDrift lasts about 2.5 seconds in automatic mode.
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
+- [ ] Switch cinematic mode OFF and ON after a manual shot. Expected: the new activation reports `ON | AUTO | Rear`; manual state does not silently carry over.
 - [ ] Confirm orbit/overhead shots remain high relative to natural gravity. The two close mounted shots may sit close to the hull, but there should be no wheel-height or ground-level view.
 
 ### Composition checks
@@ -130,9 +130,9 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] At 0–10 m/s, confirm there is no procedural camera shake.
 - [ ] Above 10 m/s, confirm shake fades in progressively and does not look like spectator input drift.
 - [ ] Select `/cine cam flyby`. Expected: the camera position stays world-locked and has no procedural shake.
-- [ ] Select `/cine cam frontmount`. Expected: a close camera sits just beyond the nose and looks back across the forward structure; vibration is small and faster than on tracking shots.
-- [ ] Select `/cine cam rearmount`. Expected: a close camera sits just behind/above the tail and looks forward along the ship; vibration is small and fast.
-- [ ] Select `/cine cam distant`. Expected: a very wide top-side view makes the ship small against the world and follows position/rotation with substantially more weight; it has no shake.
+- [ ] Select `/cine cam frontmount`. Expected: a close camera sits beyond the cockpit-relative front and looks straight forward, never back at the cockpit/grid center; vibration is small, fast, and local to the camera.
+- [ ] Select `/cine cam rearmount`. Expected: a close camera sits behind the cockpit-relative rear and looks straight forward along the ship; vibration is small, fast, and local to the camera.
+- [ ] Select `/cine cam distant`. Expected: an extremely wide view about five times farther than before makes the ship very small against the world, permits broad movement within frame, barely reacts to brief mouse turns, and has no shake.
 - [ ] Test both mounted cameras on unusually shaped grids. They intentionally do not force the whole bounding box onscreen; note any placement inside blocks for later mount-clearance tuning.
 
 ## 10. Debug output
@@ -148,11 +148,14 @@ Test these while stationary, moving forward, reversing, and turning:
 Perform these one at a time, re-entering cinematic mode between tests:
 
 - [ ] Leave the cockpit/control seat. Expected: one EmergencyStop reason, cinematic mode OFF, and no repeated camera fighting.
+- [ ] After leaving the cockpit, press V twice. Expected: only the character view changes; the camera never jumps back into the cockpit that was left.
 - [ ] Transfer control to a different cockpit or remote control. Expected: controlled-entity-change EmergencyStop.
 - [ ] Close/remove/destroy the controlled cockpit. Expected: invalid controller/target EmergencyStop.
 - [ ] Split, close, remove, or destroy the target grid. Expected: invalid/changed grid EmergencyStop.
 - [ ] Use another game camera action that takes camera ownership. Expected: camera-takeover EmergencyStop; the mod does not reclaim the camera every tick.
 - [ ] Exit to the main menu while cinematic mode is ON. Expected: unload uses the same safe shutdown path and does not leave errors repeating in the log.
+- [ ] Close the game with Alt+F4 while cinematic mode is ON. Expected: no “mod crashed” report; `SpaceEngineers.log` contains no `CineLogger.Info`/`ShowMessage` exception during `UnloadData`.
+- [ ] Reload the world after exiting with cinematic mode active. Expected: the controlled cockpit starts in first person, never persisted SpectatorFixed.
 - [ ] Save, reload, and re-enter the world. Expected: the mod initializes cleanly and F9 still works.
 - [ ] After every emergency case, run `/cine status` when possible. Expected: cinematic mode is OFF and a later activation works normally.
 
@@ -166,7 +169,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 
 - [ ] No game crash, repeating exception, or permanently stuck camera.
 - [ ] Vehicle controls remain active for the entire cinematic session.
-- [ ] Original camera state restores reliably after normal exit and safe shutdown.
+- [ ] Current controlled entity reliably receives first-person camera ownership after normal exit and safe shutdown.
 - [ ] All nine profiles work in gravity and zero gravity.
 - [ ] All shot changes are hard cuts.
 - [ ] Automatic selection is varied and obeys side continuity.
