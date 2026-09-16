@@ -19,14 +19,8 @@ namespace SECinematicCamera.Camera
     {
         private sealed class CameraState
         {
-            public IMyCameraController Controller;
             public MyEntity Entity;
-            public bool IsInFirstPerson;
-            public bool IsSpectator;
             public MySpectatorCameraMovementEnum SpectatorMovement;
-            public Vector3D SpectatorPosition;
-            public Vector3D SpectatorTarget;
-            public Vector3D SpectatorUp;
         }
 
         private CameraState _savedState;
@@ -125,41 +119,45 @@ namespace SECinematicCamera.Camera
             CameraState state = _savedState;
             _savedState = null;
             _expectedController = null;
-            if (state == null || MyAPIGateway.Session == null)
+            if (MyAPIGateway.Session == null)
                 return;
 
-            if (forceControlledView)
-                PreferControlledView(state);
+            // A deterministic first-person fallback is safer than restoring a
+            // stale cockpit or spectator controller. In particular, leaving a
+            // cockpit changes ControlledObject to the character while the saved
+            // cockpit remains valid; restoring that old cockpit makes the next V
+            // press jump back to a camera the player no longer controls.
+            MyEntity currentEntity = GetCurrentControlledEntity();
+            if (!TrySetEntityFirstPerson(currentEntity) && state != null)
+                TrySetEntityFirstPerson(state.Entity);
 
-            if (!state.IsSpectator && state.Entity != null && !state.Entity.Closed && !state.Entity.MarkedForClose)
-            {
-                // Keep the controlled entity/cockpit as the actual controller in
-                // both view modes. Third-person is a state of that controller;
-                // selecting ThirdPersonSpectator here leaves V toggling the
-                // cockpit while a spectator-style controller still owns output.
-                IMyCameraController entityCamera = state.Entity as IMyCameraController;
-                if (entityCamera != null)
-                    entityCamera.IsInFirstPersonView = state.IsInFirstPerson;
-                MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity, state.Entity);
-                if (MyAPIGateway.Session.CameraController != null)
-                    MyAPIGateway.Session.CameraController.IsInFirstPersonView = state.IsInFirstPerson;
+            if (state != null)
                 RestoreSpectatorMovement(state);
-                return;
-            }
+        }
 
-            if (state.IsSpectator && MySpectator.Static != null)
-            {
-                MyAPIGateway.Session.SetCameraController(ToCameraMode(state.SpectatorMovement), null, state.SpectatorPosition);
-                MySpectator.Static.Position = state.SpectatorPosition;
-                MySpectator.Static.SetTarget(state.SpectatorTarget, state.SpectatorUp);
-                RestoreSpectatorMovement(state);
-                return;
-            }
+        public bool RecoverControlledCockpitFromSpectator()
+        {
+            if (MyAPIGateway.Session == null)
+                return false;
 
             IMyControllableEntity controlled = MyAPIGateway.Session.ControlledObject;
-            MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity,
-                controlled != null ? controlled.Entity : null);
-            RestoreSpectatorMovement(state);
+            MyEntity entity = controlled != null ? controlled.Entity as MyEntity : null;
+            if (!(entity is IMyShipController))
+                return false;
+
+            IMyCameraController camera = MyAPIGateway.Session.CameraController;
+            if (camera != null && camera.Entity != null)
+                return false;
+
+            return TrySetEntityFirstPerson(entity);
+        }
+
+        public bool HasEntityCameraController()
+        {
+            IMyCameraController camera = MyAPIGateway.Session != null
+                ? MyAPIGateway.Session.CameraController
+                : null;
+            return camera != null && camera.Entity != null;
         }
 
         public void ClearTransientState()
@@ -181,14 +179,8 @@ namespace SECinematicCamera.Camera
             MySpectator spectator = MySpectator.Static;
             _savedState = new CameraState
             {
-                Controller = controller,
                 Entity = entity,
-                IsInFirstPerson = controller != null && controller.IsInFirstPersonView,
-                IsSpectator = entity == null,
-                SpectatorMovement = spectator.SpectatorCameraMovement,
-                SpectatorPosition = spectator.Position,
-                SpectatorTarget = spectator.Target,
-                SpectatorUp = spectator.Orientation.Up
+                SpectatorMovement = spectator.SpectatorCameraMovement
             };
 
             if (preferControlledView)
@@ -204,28 +196,38 @@ namespace SECinematicCamera.Camera
             if (entity == null || entity.Closed || entity.MarkedForClose)
                 return;
 
-            IMyCameraController cameraController = controlled as IMyCameraController;
-            state.Controller = cameraController;
             state.Entity = entity;
-            state.IsSpectator = false;
-            if (cameraController != null)
-                state.IsInFirstPerson = cameraController.IsInFirstPersonView;
         }
 
-        private static MyCameraControllerEnum ToCameraMode(MySpectatorCameraMovementEnum movement)
+        private static MyEntity GetCurrentControlledEntity()
         {
-            switch (movement)
+            IMyControllableEntity controlled = MyAPIGateway.Session != null
+                ? MyAPIGateway.Session.ControlledObject
+                : null;
+            return controlled != null ? controlled.Entity as MyEntity : null;
+        }
+
+        private static bool TrySetEntityFirstPerson(MyEntity entity)
+        {
+            if (entity == null || entity.Closed || entity.MarkedForClose ||
+                MyAPIGateway.Session == null)
+                return false;
+
+            try
             {
-                case MySpectatorCameraMovementEnum.None:
-                    return MyCameraControllerEnum.SpectatorFixed;
-                case MySpectatorCameraMovementEnum.ConstantDelta:
-                    return MyCameraControllerEnum.SpectatorDelta;
-                case MySpectatorCameraMovementEnum.FreeMouse:
-                    return MyCameraControllerEnum.SpectatorFreeMouse;
-                case MySpectatorCameraMovementEnum.Orbit:
-                    return MyCameraControllerEnum.SpectatorOrbit;
-                default:
-                    return MyCameraControllerEnum.Spectator;
+                IMyCameraController entityCamera = entity as IMyCameraController;
+                if (entityCamera != null)
+                    entityCamera.IsInFirstPersonView = true;
+
+                MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity, entity);
+                IMyCameraController activeCamera = MyAPIGateway.Session.CameraController;
+                if (activeCamera != null)
+                    activeCamera.IsInFirstPersonView = true;
+                return true;
+            }
+            catch (System.Exception)
+            {
+                return false;
             }
         }
     }

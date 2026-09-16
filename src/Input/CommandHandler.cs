@@ -115,7 +115,8 @@ namespace SECinematicCamera.Input
             ShotType shot;
             if (args.Length != 3 || !TryParseShot(args[2], out shot))
             {
-                _logger.Info("Usage: /cine cam <rear|sideleft|sideright|front|overhead|flyby|frontmount|rearmount|distant|1..9>");
+                _logger.Info("cam: rear|sideleft|sideright|front|overhead");
+                _logger.Info("cam: flyby|frontmount|rearmount|distant|1-9");
                 return;
             }
 
@@ -167,7 +168,7 @@ namespace SECinematicCamera.Input
 
             if (!valid)
             {
-                _logger.Info("Value is outside the safe range. Use /cine help.");
+                _logger.Info("Value outside safe range | /cine help");
                 return;
             }
 
@@ -206,13 +207,14 @@ namespace SECinematicCamera.Input
 
         private void ShowSetUsage()
         {
-            _logger.Info("Usage: /cine set <duration|distance|height|side|smoothing|lookahead> <value>");
+            _logger.Info("set: duration|distance|height|side|smoothing|lookahead");
         }
 
         private void ShowHelp()
         {
-            _logger.Info("/cine [on|off|next|status|get|reset|help], auto on|off, debug on|off");
-            _logger.Info("/cine cam <rear|sideleft|sideright|front|overhead|flyby|frontmount|rearmount|distant|1..9>");
+            _logger.Info("/cine on|off|next|status|get|reset|help");
+            _logger.Info("/cine auto on|off | debug on|off");
+            _logger.Info("/cine cam <name|1-9>");
             ShowSetUsage();
         }
     }

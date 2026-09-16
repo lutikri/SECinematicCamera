@@ -29,6 +29,8 @@ namespace SECinematicCamera.Session
         private CinematicSafetyController _safety;
         private CinematicTarget _target;
         private bool _active;
+        private bool _unloading;
+        private int _startupRecoveryTicks;
         private float _debugReportSeconds;
         private bool _spaceWasPressed;
         private float _spaceDebugSeconds;
@@ -50,10 +52,31 @@ namespace SECinematicCamera.Session
             _camera = new SECameraAdapter();
             _safety = new CinematicSafetyController();
             _commands.Register();
+            if (_camera.RecoverControlledCockpitFromSpectator())
+                _logger.Info("Recovered cockpit view | FIRST PERSON");
+            else if (!_camera.HasEntityCameraController())
+                _startupRecoveryTicks = 180;
         }
 
         public override void UpdateAfterSimulation()
         {
+            if (_unloading)
+                return;
+
+            if (_startupRecoveryTicks > 0)
+            {
+                _startupRecoveryTicks--;
+                if (_camera.RecoverControlledCockpitFromSpectator())
+                {
+                    _startupRecoveryTicks = 0;
+                    _logger.Info("Recovered cockpit view | FIRST PERSON");
+                }
+                else if (_camera.HasEntityCameraController())
+                {
+                    _startupRecoveryTicks = 0;
+                }
+            }
+
             try
             {
                 if (_input != null && _active && _input.IsExitPressed())
@@ -107,13 +130,13 @@ namespace SECinematicCamera.Session
             _config.Automatic = false;
             _director.SelectNextManual();
             ApplyHardCut(_director.LastChangeReason);
-            _logger.Info("Camera: " + ShotProfile.Get(_director.CurrentShot).Name + "; auto OFF.");
+            _logger.Info("MANUAL | " + ShotProfile.GetShortName(_director.CurrentShot));
         }
 
         public void SetAutomatic(bool enabled)
         {
             _config.Automatic = enabled;
-            _logger.Info("Automatic shots " + (enabled ? "ON." : "OFF."));
+            _logger.Info(enabled ? "AUTO ON" : "AUTO OFF");
         }
 
         public void SetDebug(bool enabled)
@@ -123,21 +146,21 @@ namespace SECinematicCamera.Session
             _debugReportSeconds = 0f;
             _spaceWasPressed = false;
             _spaceDebugSeconds = 0f;
-            _logger.Info("Debug " + (enabled ? "ON." : "OFF."));
+            _logger.Info(enabled ? "DEBUG ON" : "DEBUG OFF");
         }
 
         public void ResetSettings()
         {
             _config.Reset();
             _logger.DebugEnabled = _config.DebugEnabled;
-            _logger.Info("Runtime settings reset to compiled defaults.");
+            _logger.Info("Defaults restored | AUTO ON");
         }
 
         public void ForceNextShot()
         {
             if (!_active)
             {
-                _logger.Info("Cinematic mode is OFF.");
+                _logger.Info("OFF | use F9 or /cine on");
                 return;
             }
 
@@ -145,7 +168,8 @@ namespace SECinematicCamera.Session
             if (_director.ForceNext(_target))
             {
                 ApplyHardCut(_director.LastChangeReason);
-                _logger.Info("Camera: " + ShotProfile.Get(_director.CurrentShot).Name + ".");
+                _logger.Info((_config.Automatic ? "AUTO" : "MANUAL") + " | " +
+                    ShotProfile.GetShortName(_director.CurrentShot));
             }
         }
 
@@ -159,30 +183,32 @@ namespace SECinematicCamera.Session
             _config.Automatic = false;
             _director.SelectManual(shot);
             ApplyHardCut(_director.LastChangeReason);
-            _logger.Info("Camera: " + ShotProfile.Get(shot).Name + "; auto OFF.");
+            _logger.Info("MANUAL | " + ShotProfile.GetShortName(shot));
         }
 
         public string GetStatus()
         {
             if (!_active || _target == null)
-                return "OFF; auto " + (_config.Automatic ? "ON" : "OFF") + ".";
+                return "OFF | next start: AUTO";
 
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "ON; target {0}; shot {1}; age {2:0.0}/{3:0.0}s; speed {4:0.0} m/s; {5}; {6}; {7}",
-                _target.Grid.DisplayName, _director.CurrentShot, _director.ShotAgeSeconds,
-                _director.CurrentDurationSeconds, _target.Speed, _director.LastChangeReason,
-                _screenComposer.GetDiagnostics(), _smoother.GetDiagnostics());
+                "ON | {0} | {1} | {2} | {3:0}/{4:0}s | {5:0}m/s",
+                _config.Automatic ? "AUTO" : "MANUAL",
+                ShotProfile.GetShortName(_director.CurrentShot),
+                CompactName(_target.Grid.DisplayName), _director.ShotAgeSeconds,
+                _director.CurrentDurationSeconds, _target.Speed);
         }
 
         public string GetSettings()
         {
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "duration {0:0.###}, distance {1:0.###}, height {2:0.###}, side {3:0.###}, smoothing {4:0.###}, lookahead {5:0.###}",
+                "time {0:0.#}s | dist {1:0.##} | h {2:0.##} | side {3:0.##} | smooth {4:0.##} | lead {5:0.##}",
                 _config.ShotDurationSeconds, _config.Distance, _config.Height, _config.Side,
                 _config.Smoothing, _config.LookAheadSeconds);
         }
 
-        public void EmergencyStop(string reason, bool forceControlledView = false)
+        public void EmergencyStop(string reason, bool forceControlledView = false,
+            bool writeMessage = true)
         {
             _active = false;
             _debugReportSeconds = 0f;
@@ -196,39 +222,53 @@ namespace SECinematicCamera.Session
             }
             catch (System.Exception restoreException)
             {
-                if (_logger != null)
+                if (_logger != null && writeMessage)
                     _logger.Info("Camera restore failed: " + restoreException.Message);
             }
 
-            if (_target != null)
-                _target.Clear();
+            try
+            {
+                if (_target != null)
+                    _target.Clear();
+            }
+            catch (System.Exception) { }
             _target = null;
 
-            if (_director != null)
-                _director.Clear();
-            if (_smoother != null)
-                _smoother.Clear();
-            if (_shotSolver != null)
-                _shotSolver.Clear();
-            if (_camera != null)
-                _camera.ClearTransientState();
+            try { if (_director != null) _director.Clear(); }
+            catch (System.Exception) { }
+            try { if (_smoother != null) _smoother.Clear(); }
+            catch (System.Exception) { }
+            try { if (_shotSolver != null) _shotSolver.Clear(); }
+            catch (System.Exception) { }
+            try { if (_camera != null) _camera.ClearTransientState(); }
+            catch (System.Exception) { }
 
-            if (_logger != null)
-                _logger.Info("OFF — " + reason);
+            if (_logger != null && writeMessage)
+                _logger.Info("OFF | " + reason);
         }
 
         protected override void UnloadData()
         {
-            if (_commands != null)
-                _commands.Unregister();
-            EmergencyStop("Session/world unload.");
-            base.UnloadData();
+            _unloading = true;
+            // Never call chat/UI services while the game is tearing the session
+            // down. Alt+F4 can invalidate them before UnloadData finishes.
+            try { EmergencyStop("Session/world unload.", true, false); }
+            catch (System.Exception) { }
+            try { if (_commands != null) _commands.Unregister(); }
+            catch (System.Exception) { }
+            try { base.UnloadData(); }
+            catch (System.Exception) { }
         }
 
         private void TryStart(bool preferControlledView = false)
         {
             if (_active)
                 return;
+
+            // Manual testing is session-local. Every fresh activation starts in
+            // a clearly announced automatic mode instead of silently preserving
+            // Ctrl+F9 or /cine cam from the previous activation.
+            _config.Automatic = true;
 
             string reason;
             CinematicTarget target;
@@ -259,7 +299,7 @@ namespace SECinematicCamera.Session
             _debugReportSeconds = 0f;
             _spaceWasPressed = false;
             _spaceDebugSeconds = 0f;
-            _logger.Info("ON — RearHighThreeQuarter; target " + target.Grid.DisplayName + ".");
+            _logger.Info("ON | AUTO | Rear | " + CompactName(target.Grid.DisplayName));
             _logger.Debug("Spectator movement before activation: " + _camera.CapturedMovementName +
                 "; active: " + _camera.GetLastWriteDiagnostics().SpectatorMovement + ".");
         }
@@ -275,16 +315,22 @@ namespace SECinematicCamera.Session
 
             _target.Refresh();
             bool changed;
-            if (_shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
+            bool flyByTimedOut = _director.CurrentShot == ShotType.WorldLockedFlyBy &&
+                _director.ShotAgeSeconds >= 6f;
+            if (flyByTimedOut || _shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
             {
+                string flyByReason = flyByTimedOut
+                    ? "Fly-by reached 6 second limit"
+                    : "Fly-by ended: target receded 700 m from the fixed camera";
                 if (_config.Automatic)
                 {
-                    changed = _director.RequestNext(_target,
-                        "Fly-by ended: target receded 700 m from the fixed camera");
+                    changed = _director.RequestNext(_target, flyByReason);
                 }
                 else
                 {
-                    _director.RestartCurrent("Manual fly-by repositioned at 700 m");
+                    _director.RestartCurrent(flyByTimedOut
+                        ? "Manual fly-by repositioned after 6 seconds"
+                        : "Manual fly-by repositioned at 700 m");
                     ApplyHardCut(_director.LastChangeReason);
                     return;
                 }
@@ -375,6 +421,13 @@ namespace SECinematicCamera.Session
         {
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "({0:0.00}, {1:0.00}, {2:0.00})", value.X, value.Y, value.Z);
+        }
+
+        private static string CompactName(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "Grid";
+            return value.Length <= 16 ? value : value.Substring(0, 15) + "…";
         }
 
         private void ApplyHardCut(string reason)
