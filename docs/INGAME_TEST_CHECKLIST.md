@@ -17,15 +17,17 @@ Record failures with the test number, what happened, the expected result, and th
 ## 2. First milestone: activation and restoration
 
 - [ ] Begin in first-person cockpit view and note the exact view.
-- [ ] Press F9. Expected: cinematic mode turns ON in `RearHighThreeQuarter` and names the controlled grid.
+- [ ] Press F9. Expected: cinematic mode turns ON with a motion-weighted opening shot and a `Cine Cam - Auto` HUD notification.
 - [ ] While cinematic mode is active, steer, accelerate, brake, roll, and use normal ship/rover controls. Expected: the vehicle remains fully controllable.
-- [ ] Confirm the camera follows smoothly while staying in the same rear-high shot.
+- [ ] Confirm the camera follows smoothly while staying in the selected opening shot.
 - [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
+- [ ] Press B to enter and exit cinematic mode. Expected: it behaves like F9 and does not also trigger the vanilla build-placement action.
 - [ ] Repeat from third-person view. Expected: F9 exit deliberately falls back to first-person cockpit view.
 - [ ] After that first-person fallback, press V twice. Expected: the same controlled cockpit cleanly changes first → third → first; it must not remain in SpectatorFixed or jump to another cockpit.
 - [ ] Activate from first person and press V. Expected: cinematic mode exits to the current controlled entity's first-person camera, not SpectatorFixed.
 - [ ] Repeat from third person and press V. Expected: first-person fallback is active and subsequent V presses behave normally.
 - [ ] While active, press Ctrl+F9 repeatedly. Expected: each press hard-cuts to the next manual profile and automatic selection turns OFF; no Blueprint screen opens.
+- [ ] Repeat with Ctrl+B. Expected: it cycles manual profiles without creating a blueprint; after CineCam exits, the vanilla B/Ctrl+B controls work normally again.
 - [ ] If a saved world loads into spectator while a cockpit is still controlled, expected: startup recovery immediately selects that cockpit in first person.
 - [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
 
@@ -49,7 +51,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Run `/cine`. Expected: it toggles cinematic mode.
 - [ ] Run `/cine on` twice. Expected: cinematic mode remains ON without duplicating state.
 - [ ] Run `/cine off` twice. Expected: cinematic mode remains safely OFF.
-- [ ] Confirm handled `/cine` commands do not appear in multiplayer chat and are not sent to the server/other players.
+- [ ] Confirm handled `/cine` commands do not appear in multiplayer chat and are not sent to the server/other players; responses appear as temporary HUD notifications.
 - [ ] Run `/cine help`. Expected: concise command usage appears.
 - [ ] Run an invalid command such as `/cine banana`. Expected: concise error and `/cine help` guidance, with no exception.
 - [ ] Run malformed commands such as `/cine cam`, `/cine auto maybe`, and `/cine set distance nope`. Expected: concise usage messages and no state corruption.
@@ -67,14 +69,18 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] `/cine cam frontmount` and `/cine cam 7`: FrontMountedClose.
 - [ ] `/cine cam rearmount` and `/cine cam 8`: RearMountedForward.
 - [ ] `/cine cam distant` and `/cine cam 9`: DistantTopSide.
+- [ ] `/cine cam chase` and `/cine cam 10`: Chase Rear or Chase Offset; the selected variant is named in the HUD notification/status.
 - [ ] Confirm every manual selection immediately hard-cuts to the new pose—there must be no travel/interpolation between shots.
 - [ ] Confirm position and aim follow smoothly after the cut for all tracking shots.
 - [ ] For WorldLockedFlyBy, confirm the camera is initially placed approximately 60–100 m away, stays fixed in world space, and pans smoothly toward the moving vehicle. Small left/right course corrections must not flip the composition or jerk the pan.
-- [ ] With auto ON, fly-by should cut at six seconds or when the receding grid reaches approximately 700 m, whichever happens first. Manual fly-by should hard-cut to a newly placed fixed camera at the same limits.
-- [ ] Confirm front mount lasts about 2 seconds and rear mount about 2.5 seconds in automatic mode.
-- [ ] Confirm OverheadDrift lasts about 2.5 seconds in automatic mode.
+- [ ] With auto ON, fly-by should cut at five seconds or when the receding grid reaches approximately 700 m, whichever happens first. Manual fly-by should hard-cut to a newly placed fixed camera at the same limits.
+- [ ] Confirm DistantTopSide lasts about 5 seconds in automatic mode.
+- [ ] Confirm both mounted cameras last about 2.5 seconds in automatic mode.
+- [ ] Confirm OverheadDrift lasts about 3 seconds in automatic mode.
+- [ ] Confirm Chase lasts about 6 seconds in automatic mode.
 - [ ] Confirm selecting a manual shot turns automatic changes OFF.
-- [ ] Switch cinematic mode OFF and ON after a manual shot. Expected: the new activation reports `ON | AUTO | Rear`; manual state does not silently carry over.
+- [ ] Switch cinematic mode OFF and ON after a manual shot. Expected: the new activation reports `Cine Cam - Auto`; manual state does not silently carry over.
+- [ ] Switch cinematic mode OFF and ON several times. Expected: consecutive activations never reuse the same opening shot, and the opening varies with vehicle motion.
 - [ ] Confirm orbit/overhead shots remain high relative to natural gravity. The two close mounted shots may sit close to the hull, but there should be no wheel-height or ground-level view.
 
 ### Composition checks
@@ -83,7 +89,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] In RearHighThreeQuarter, confirm the ship is intentionally offset from exact screen center and the view favors its forward/upper detail.
 - [ ] In FrontHighThreeQuarter, confirm the focus favors the nose/cockpit region rather than the geometric center.
 - [ ] In SideHighLeft and SideHighRight, fly forward and backward. Expected: the camera leaves visible lead room in the direction of screen-space travel.
-- [ ] Confirm the nine profiles do not all place the ship at the same screen coordinate.
+- [ ] Confirm the ten profiles do not all place the ship at the same screen coordinate.
 - [ ] Rotate a long, wide, and tall grid. Expected: ordinary tracking shots keep the oriented grid bounds inside approximately 5% screen margins by moving outward when necessary.
 - [ ] Confirm bounds correction never produces a smooth travel path during a shot cut; manual and automatic shot changes remain hard cuts.
 
@@ -104,9 +110,21 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Stop or move very slowly. Expected: WorldLockedFlyBy becomes uncommon; RearHighThreeQuarter remains a safe option.
 - [ ] Run `/cine next` repeatedly. Expected: each command immediately hard-cuts to another eligible shot while preserving the side-continuity rule.
 
+### Chase checks
+
+- [ ] Select Chase while stationary. Expected: the camera begins behind and slightly above the vehicle, with no cut between its subsequent follow movements.
+- [ ] Accelerate sharply. Expected: the vehicle moves forward in frame before the spring catches up, and camera distance briefly increases with acceleration.
+- [ ] Compare low and high constant speeds. Expected: Chase runs farther from the vehicle at higher speed.
+- [ ] Turn sharply at speed. Expected: the camera initially preserves its old world-space trajectory, then smoothly settles behind the new trajectory instead of snapping behind grid Forward.
+- [ ] Fly with strong lateral slip. Expected: Chase follows velocity direction progressively above roughly 2 m/s and is primarily trajectory-aligned by roughly 22 m/s.
+- [ ] For Chase Rear, confirm the view remains nearly centered behind the trajectory with only a subtle lateral drift.
+- [ ] For Chase Offset, remain in the shot long enough to see a continuous rear-left/center/rear-right wander with no internal cut.
+- [ ] Roll rapidly on a planet. Expected: the horizon carries about 30% of vehicle roll instead of matching it fully.
+- [ ] Roll rapidly in zero gravity. Expected: camera Up follows through a slow, restrained response without snapping one-for-one to cockpit roll.
+
 ## 7. Planet and zero-gravity orientation
 
-- [ ] On a planet, drive across slopes and uneven ground. Expected: camera Up remains aligned with natural gravity rather than rolling with the rover.
+- [ ] On a planet, drive across slopes and uneven ground. Expected: camera Up remains aligned with natural gravity rather than rolling with the rover, except Chase's deliberately restrained 30% roll response.
 - [ ] On a planet, point a ship steeply upward/downward. Expected: camera orientation remains stable and does not flip or produce an invalid view.
 - [ ] In zero gravity, rotate the ship through several orientations. Expected: the occupied cockpit's orientation defines forward/up, even when the cockpit is mounted sideways relative to the grid; the camera does not flip or disappear.
 - [ ] Repeat every manual profile in both natural gravity and zero gravity.
@@ -154,7 +172,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] Split, close, remove, or destroy the target grid. Expected: invalid/changed grid EmergencyStop.
 - [ ] Use another game camera action that takes camera ownership. Expected: camera-takeover EmergencyStop; the mod does not reclaim the camera every tick.
 - [ ] Exit to the main menu while cinematic mode is ON. Expected: unload uses the same safe shutdown path and does not leave errors repeating in the log.
-- [ ] Close the game with Alt+F4 while cinematic mode is ON. Expected: no “mod crashed” report; `SpaceEngineers.log` contains no `CineLogger.Info`/`ShowMessage` exception during `UnloadData`.
+- [ ] Close the game with Alt+F4 while cinematic mode is ON. Expected: no “mod crashed” report; `SpaceEngineers.log` contains no `CineLogger.Info`/`ShowNotification` exception during `UnloadData`.
 - [ ] Reload the world after exiting with cinematic mode active. Expected: the controlled cockpit starts in first person, never persisted SpectatorFixed.
 - [ ] Save, reload, and re-enter the world. Expected: the mod initializes cleanly and F9 still works.
 - [ ] After every emergency case, run `/cine status` when possible. Expected: cinematic mode is OFF and a later activation works normally.
@@ -170,7 +188,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 - [ ] No game crash, repeating exception, or permanently stuck camera.
 - [ ] Vehicle controls remain active for the entire cinematic session.
 - [ ] Current controlled entity reliably receives first-person camera ownership after normal exit and safe shutdown.
-- [ ] All nine profiles work in gravity and zero gravity.
+- [ ] All ten profiles work in gravity and zero gravity.
 - [ ] All shot changes are hard cuts.
 - [ ] Automatic selection is varied and obeys side continuity.
 - [ ] All handled commands remain local.

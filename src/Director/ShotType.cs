@@ -10,6 +10,7 @@ namespace SECinematicCamera.Director
         WorldLockedFlyBy = 6,
         FrontMountedClose = 7,
         RearMountedForward = 8,
-        DistantTopSide = 9
+        DistantTopSide = 9,
+        Chase = 10
     }
 }

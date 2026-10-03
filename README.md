@@ -19,11 +19,12 @@ https://github.com/user-attachments/assets/0fdadb40-a6a4-40ee-b30c-bb1171c5eb69
 
 ## What it does
 
-- Automatically selects shots using shot duration, recent shot history, speed, angular motion, and left/right continuity.
+- Automatically selects the opening shot and later cuts using shot duration, recent shot history, speed, angular motion, and left/right continuity.
+- Includes a trajectory-aware Chase shot that follows velocity during slides, uses spring lag, and expands with speed and acceleration.
 - Uses hard cuts between cameras—there is no artificial flight from one camera position to the next.
 - Smooths position and aim *inside* a tracking shot, allowing the ship to move naturally within the frame during acceleration and rotation.
 - Keeps mounted shots short and rigid, aims them parallel to the occupied cockpit's forward axis, and adds a subtle camera-local high-speed vibration.
-- Places fly-by cameras in world space and lets the ship pass them instead of attaching the camera to the grid; each fly-by is capped at six seconds.
+- Places fly-by cameras in world space and lets the ship pass them instead of attaching the camera to the grid; each fly-by is capped at five seconds.
 - Uses natural gravity as camera Up on planets and the occupied cockpit/controller orientation in zero gravity.
 - Keeps ordinary tracking shots inside safe screen margins while still allowing cinematic composition and lead room.
 - Preserves ship controls while cinematic mode is active.
@@ -41,6 +42,7 @@ The current shot set includes:
 | Front Mounted Close | Short right-side body camera at the cockpit's longitudinal position |
 | Rear Mounted Forward | Short rear-left corner camera looking forward along the cockpit axis |
 | Distant Top-Side | Extremely wide, slow establishing view with heavy position and rotation inertia |
+| Chase Rear / Offset | Spring-lag pursuit aligned to the vehicle's trajectory, with speed/acceleration distance and restrained roll |
 
 ## How the system works
 
@@ -55,9 +57,9 @@ The current shot set includes:
 
 | Input | Action |
 | --- | --- |
-| `F9` | Toggle cinematic mode |
-| `V` while cinematic is active | Exit cinematic mode and return to the normal ship camera |
-| `Ctrl+F9` | Cut to the next manual test camera and disable automatic selection |
+| `F9` or `B` | Toggle cinematic mode |
+| `V` while cinematic is active | Exit cinematic mode and return to the normal ship camera without leaving the cockpit |
+| `Ctrl+F9` or `Ctrl+B` | Cut to the next manual test camera and disable automatic selection |
 | `/cine` | Toggle cinematic mode |
 | `/cine on` / `/cine off` | Explicitly enable or disable cinematic mode |
 | `/cine next` | Force the director to choose another suitable shot |
@@ -75,6 +77,7 @@ Manual camera selection:
 /cine cam frontmount
 /cine cam rearmount
 /cine cam distant
+/cine cam chase
 /cine cam 1
 ```
 
@@ -91,15 +94,15 @@ Runtime tuning:
 
 `distance` is relative to the vehicle size; `height` and `side` are ratios of that distance. Runtime tuning is not persisted yet. Use `/cine get` to view current values and `/cine reset` to restore the compiled defaults.
 
-Other commands: `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, and `/cine help`. Handled `/cine` commands stay local and are not sent to chat or the server.
+Other commands: `/cine status`, `/cine get`, `/cine reset`, `/cine debug on|off`, and `/cine help`. Handled `/cine` commands stay local and are not sent to chat or the server. Mod feedback uses temporary HUD notifications instead of chat messages.
 
-Manual mode lasts only until cinematic mode is switched off. Every fresh `F9` or `/cine on` activation starts clearly in `AUTO` mode. Exiting cinematic mode always selects the currently controlled entity's first-person camera; the normal `V` key can then switch views as usual.
+Manual mode lasts only until cinematic mode is switched off. Every fresh `F9`, `B`, or `/cine on` activation starts clearly in `AUTO` mode with a motion-weighted opening shot; consecutive activations do not reuse the same opening shot. `B` and `Ctrl+B` overlap vanilla build/blueprint bindings, so those controls are temporarily suppressed while handled by CineCam and restored on every shutdown path. Exiting cinematic mode always selects the currently controlled entity's first-person camera; the normal `V` key can then switch views as usual.
 
 ## Installation for players
 
 1. [Subscribe on Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3802777032).
 2. Add **CineCam — Automatic Camera Director** to the world's mod list.
-3. Load the world, occupy a ship or rover controller, and press `F9`.
+3. Load the world, occupy a ship or rover controller, and press `F9` or `B`.
 
 To install a development build instead, build the project locally or copy a packaged mod into:
 

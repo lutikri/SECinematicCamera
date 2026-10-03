@@ -116,7 +116,7 @@ namespace SECinematicCamera.Input
             if (args.Length != 3 || !TryParseShot(args[2], out shot))
             {
                 _logger.Info("cam: rear|sideleft|sideright|front|overhead");
-                _logger.Info("cam: flyby|frontmount|rearmount|distant|1-9");
+                _logger.Info("cam: flyby|frontmount|rearmount|distant|chase|1-10");
                 return;
             }
 
@@ -201,6 +201,7 @@ namespace SECinematicCamera.Input
                 case "frontmount": case "goprofront": case "7": shot = ShotType.FrontMountedClose; return true;
                 case "rearmount": case "goprorear": case "8": shot = ShotType.RearMountedForward; return true;
                 case "distant": case "topside": case "9": shot = ShotType.DistantTopSide; return true;
+                case "chase": case "10": shot = ShotType.Chase; return true;
                 default: shot = ShotType.RearHighThreeQuarter; return false;
             }
         }
@@ -214,7 +215,7 @@ namespace SECinematicCamera.Input
         {
             _logger.Info("/cine on|off|next|status|get|reset|help");
             _logger.Info("/cine auto on|off | debug on|off");
-            _logger.Info("/cine cam <name|1-9>");
+            _logger.Info("/cine cam <name|1-10>");
             ShowSetUsage();
         }
     }

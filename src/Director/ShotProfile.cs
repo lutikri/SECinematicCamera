@@ -78,15 +78,15 @@ namespace SECinematicCamera.Director
                 case ShotType.OverheadDrift:
                     return new ShotProfile(type, "Overhead Drift", -0.15, 0.0, 2.4, 0.0, false,
                         0.08, 0.0, 0.05, 0.0, -0.06, false, 0.0,
-                        true, 0.25, 1.30, 0.90, 2.10, 0.26, 0.002, 0.06, 0.35);
+                        true, 0.30, 1.30, 0.90, 2.10, 0.26, 0.002, 0.06, 0.35);
                 case ShotType.WorldLockedFlyBy:
                     return new ShotProfile(type, "World-Locked Fly-By", 1.30, 0.45, 1.35, 0.0, true,
                         0.12, 0.08, 0.10, 0.0, -0.10, false, 0.0,
-                        false, 0.60, 0.05, 0.35, 0.0, 0.0, 0.0, 0.0, 0.0);
+                        false, 0.50, 0.05, 0.35, 0.0, 0.0, 0.0, 0.0, 0.0);
                 case ShotType.FrontMountedClose:
                     return new ShotProfile(type, "Front-Mounted Close", 0.0, 0.0, 0.0, 0.0, false,
                         0.0, 0.0, 0.0, 0.0, 0.0, false, 0.0,
-                        false, 0.20, 0.001, 0.001, 0.0, 0.0, 0.008, 0.22, 2.8);
+                        false, 0.25, 0.001, 0.001, 0.0, 0.0, 0.008, 0.22, 2.8);
                 case ShotType.RearMountedForward:
                     return new ShotProfile(type, "Rear-Mounted Forward", 0.0, 0.0, 0.0, 0.0, false,
                         0.0, 0.0, 0.0, 0.0, 0.0, false, 0.0,
@@ -94,7 +94,11 @@ namespace SECinematicCamera.Director
                 case ShotType.DistantTopSide:
                     return new ShotProfile(type, "Distant Top-Side Establishing", -16.0, 11.0, 14.0, 0.0, false,
                         0.05, 0.02, 0.0, 0.12, -0.07, true, 0.10,
-                        true, 2.0, 7.5, 6.5, 9.0, 3.0, 0.0, 0.0, 0.0);
+                        true, 0.50, 7.5, 6.5, 9.0, 3.0, 0.0, 0.0, 0.0);
+                case ShotType.Chase:
+                    return new ShotProfile(type, "Chase", -1.0, 0.0, 0.45, 0.0, false,
+                        0.12, 0.06, 0.08, 0.0, -0.10, false, 0.0,
+                        true, 0.60, 1.15, 0.65, 1.45, 0.75, 0.002, 0.06, 0.45);
                 default:
                     return new ShotProfile(ShotType.RearHighThreeQuarter, "Rear High Three-Quarter",
                         -1.0, 0.0, 1.0, 0.65, false,
@@ -115,6 +119,7 @@ namespace SECinematicCamera.Director
                 case ShotType.FrontMountedClose: return "Mount Front";
                 case ShotType.RearMountedForward: return "Mount Rear";
                 case ShotType.DistantTopSide: return "Distant";
+                case ShotType.Chase: return "Chase";
                 default: return "Rear";
             }
         }

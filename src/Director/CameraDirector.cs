@@ -17,12 +17,15 @@ namespace SECinematicCamera.Director
             ShotType.WorldLockedFlyBy,
             ShotType.FrontMountedClose,
             ShotType.RearMountedForward,
-            ShotType.DistantTopSide
+            ShotType.DistantTopSide,
+            ShotType.Chase
         };
 
         private readonly CinematicConfig _config;
         private readonly List<ShotType> _history = new List<ShotType>();
         private readonly Random _random = new Random();
+        private bool _hasPreviousOpeningShot;
+        private ShotType _previousOpeningShot;
 
         public ShotType CurrentShot { get; private set; }
         public float ShotAgeSeconds { get; private set; }
@@ -34,7 +37,7 @@ namespace SECinematicCamera.Director
                 float duration = _config.ShotDurationSeconds *
                     (float)ShotProfile.Get(CurrentShot).DurationScale;
                 return CurrentShot == ShotType.WorldLockedFlyBy
-                    ? System.Math.Min(6f, duration)
+                    ? System.Math.Min(5f, duration)
                     : duration;
             }
         }
@@ -47,9 +50,11 @@ namespace SECinematicCamera.Director
         public void Reset(CinematicTarget target)
         {
             _history.Clear();
-            CurrentShot = ShotType.RearHighThreeQuarter;
+            CurrentShot = ChooseOpening(target);
+            _previousOpeningShot = CurrentShot;
+            _hasPreviousOpeningShot = true;
             ShotAgeSeconds = 0f;
-            LastChangeReason = "Safe initial shot";
+            LastChangeReason = "Motion-weighted opening choice";
         }
 
         public bool Update(CinematicTarget target, float elapsedSeconds)
@@ -146,6 +151,35 @@ namespace SECinematicCamera.Director
             return ShotType.RearHighThreeQuarter;
         }
 
+        private ShotType ChooseOpening(CinematicTarget target)
+        {
+            double[] weights = new double[AvailableShots.Length];
+            double total = 0.0;
+            for (int index = 0; index < AvailableShots.Length; index++)
+            {
+                ShotType candidate = AvailableShots[index];
+                double weight = Suitability(candidate, target);
+                if (_hasPreviousOpeningShot && candidate == _previousOpeningShot)
+                    weight = 0.0;
+
+                weights[index] = weight;
+                total += weight;
+            }
+
+            if (total <= 0.0001)
+                return ShotType.RearHighThreeQuarter;
+
+            double choice = _random.NextDouble() * total;
+            for (int index = 0; index < AvailableShots.Length; index++)
+            {
+                choice -= weights[index];
+                if (choice <= 0.0 && weights[index] > 0.0)
+                    return AvailableShots[index];
+            }
+
+            return ShotType.RearHighThreeQuarter;
+        }
+
         private static double Suitability(ShotType shot, CinematicTarget target)
         {
             double speed = target.Speed;
@@ -167,6 +201,8 @@ namespace SECinematicCamera.Director
                     return speed < 4.0 ? 0.10 : 0.65 + Math.Min(speed / 100.0, 0.55);
                 case ShotType.DistantTopSide:
                     return 0.80 + Math.Min(speed / 140.0, 0.45);
+                case ShotType.Chase:
+                    return 0.55 + Math.Min(speed / 70.0, 1.20);
                 default:
                     return 0.45;
             }
@@ -187,6 +223,10 @@ namespace SECinematicCamera.Director
 
             return (from == ShotType.RearHighThreeQuarter && to == ShotType.RearMountedForward) ||
                    (from == ShotType.RearMountedForward && to == ShotType.RearHighThreeQuarter) ||
+                   (from == ShotType.RearHighThreeQuarter && to == ShotType.Chase) ||
+                   (from == ShotType.Chase && to == ShotType.RearHighThreeQuarter) ||
+                   (from == ShotType.RearMountedForward && to == ShotType.Chase) ||
+                   (from == ShotType.Chase && to == ShotType.RearMountedForward) ||
                    (from == ShotType.FrontHighThreeQuarter && to == ShotType.FrontMountedClose) ||
                    (from == ShotType.FrontMountedClose && to == ShotType.FrontHighThreeQuarter);
         }

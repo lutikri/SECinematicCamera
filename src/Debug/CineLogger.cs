@@ -4,8 +4,6 @@ namespace SECinematicCamera.Debug
 {
     public sealed class CineLogger
     {
-        private const string Sender = "CineCam";
-
         public bool DebugEnabled { get; set; }
 
         public void Info(string message)
@@ -16,7 +14,7 @@ namespace SECinematicCamera.Debug
             try
             {
                 if (MyAPIGateway.Utilities != null)
-                    MyAPIGateway.Utilities.ShowMessage(Sender, message);
+                    MyAPIGateway.Utilities.ShowNotification(message, 2200, "White");
             }
             catch (System.Exception) { }
         }

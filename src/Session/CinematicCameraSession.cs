@@ -10,7 +10,7 @@ using VRage.Game.Components;
 
 namespace SECinematicCamera.Session
 {
-    [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
+    [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation | MyUpdateOrder.AfterSimulation)]
     public sealed class CinematicCameraSession : MySessionComponentBase
     {
         private const float TickSeconds = 1f / 60f;
@@ -81,7 +81,7 @@ namespace SECinematicCamera.Session
             {
                 if (_input != null && _active && _input.IsExitPressed())
                 {
-                    EmergencyStop("Vanilla view requested with V.", true);
+                    EmergencyStop("Cine Cam - Off", true);
                     return;
                 }
 
@@ -92,7 +92,7 @@ namespace SECinematicCamera.Session
                 else if (_input != null && _input.IsTogglePressed())
                 {
                     if (_active)
-                        EmergencyStop("Cinematic mode disabled.");
+                        EmergencyStop("Cine Cam - Off");
                     else
                         TryStart(true);
                 }
@@ -104,6 +104,27 @@ namespace SECinematicCamera.Session
             {
                 EmergencyStop("Cinematic update exception: " + exception.Message);
             }
+
+            if (!_active && _input != null)
+                _input.ReleaseSuppressedControls();
+        }
+
+        public override void UpdateBeforeSimulation()
+        {
+            if (_unloading || _input == null)
+                return;
+
+            try
+            {
+                _input.PrepareControlSuppression(_active);
+            }
+            catch (System.Exception exception)
+            {
+                if (_active)
+                    EmergencyStop("Input suppression exception: " + exception.Message);
+                else
+                    _input.ReleaseSuppressedControls();
+            }
         }
 
         public void SetCinematicEnabled(bool enabled)
@@ -111,7 +132,7 @@ namespace SECinematicCamera.Session
             if (enabled)
                 TryStart();
             else
-                EmergencyStop("Cinematic mode disabled.");
+                EmergencyStop("Cine Cam - Off");
         }
 
         public void ToggleCinematic()
@@ -130,7 +151,7 @@ namespace SECinematicCamera.Session
             _config.Automatic = false;
             _director.SelectNextManual();
             ApplyHardCut(_director.LastChangeReason);
-            _logger.Info("MANUAL | " + ShotProfile.GetShortName(_director.CurrentShot));
+            _logger.Info(_shotSolver.GetShotName(_director.CurrentShot));
         }
 
         public void SetAutomatic(bool enabled)
@@ -160,7 +181,7 @@ namespace SECinematicCamera.Session
         {
             if (!_active)
             {
-                _logger.Info("OFF | use F9 or /cine on");
+                _logger.Info("Cine Cam - Off | use F9, B, or /cine on");
                 return;
             }
 
@@ -168,8 +189,7 @@ namespace SECinematicCamera.Session
             if (_director.ForceNext(_target))
             {
                 ApplyHardCut(_director.LastChangeReason);
-                _logger.Info((_config.Automatic ? "AUTO" : "MANUAL") + " | " +
-                    ShotProfile.GetShortName(_director.CurrentShot));
+                _logger.Info(_shotSolver.GetShotName(_director.CurrentShot));
             }
         }
 
@@ -183,7 +203,7 @@ namespace SECinematicCamera.Session
             _config.Automatic = false;
             _director.SelectManual(shot);
             ApplyHardCut(_director.LastChangeReason);
-            _logger.Info("MANUAL | " + ShotProfile.GetShortName(shot));
+            _logger.Info(_shotSolver.GetShotName(shot));
         }
 
         public string GetStatus()
@@ -194,7 +214,7 @@ namespace SECinematicCamera.Session
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "ON | {0} | {1} | {2} | {3:0}/{4:0}s | {5:0}m/s",
                 _config.Automatic ? "AUTO" : "MANUAL",
-                ShotProfile.GetShortName(_director.CurrentShot),
+                _shotSolver.GetShotName(_director.CurrentShot),
                 CompactName(_target.Grid.DisplayName), _director.ShotAgeSeconds,
                 _director.CurrentDurationSeconds, _target.Speed);
         }
@@ -242,15 +262,17 @@ namespace SECinematicCamera.Session
             catch (System.Exception) { }
             try { if (_camera != null) _camera.ClearTransientState(); }
             catch (System.Exception) { }
+            try { if (_input != null) _input.ReleaseSuppressedControls(); }
+            catch (System.Exception) { }
 
             if (_logger != null && writeMessage)
-                _logger.Info("OFF | " + reason);
+                _logger.Info(reason);
         }
 
         protected override void UnloadData()
         {
             _unloading = true;
-            // Never call chat/UI services while the game is tearing the session
+            // Never call HUD/UI services while the game is tearing the session
             // down. Alt+F4 can invalidate them before UnloadData finishes.
             try { EmergencyStop("Session/world unload.", true, false); }
             catch (System.Exception) { }
@@ -267,7 +289,7 @@ namespace SECinematicCamera.Session
 
             // Manual testing is session-local. Every fresh activation starts in
             // a clearly announced automatic mode instead of silently preserving
-            // Ctrl+F9 or /cine cam from the previous activation.
+            // Ctrl+F9, Ctrl+B, or /cine cam from the previous activation.
             _config.Automatic = true;
 
             string reason;
@@ -287,7 +309,7 @@ namespace SECinematicCamera.Session
             target.Refresh();
             _director.Reset(target);
             _shotSolver.BeginShot(target, _director.CurrentShot);
-            CameraPose initialPose = SolveComposedPose(target, _director.CurrentShot);
+            CameraPose initialPose = SolveComposedPose(target, _director.CurrentShot, 0.0);
             initialPose = _smoother.Reset(initialPose, target.Position);
             if (!_camera.TryEnterFixed(initialPose, preferControlledView, out reason))
             {
@@ -305,7 +327,7 @@ namespace SECinematicCamera.Session
             _debugReportSeconds = 0f;
             _spaceWasPressed = false;
             _spaceDebugSeconds = 0f;
-            _logger.Info("ON | AUTO | Rear | " + CompactName(target.Grid.DisplayName));
+            _logger.Info("Cine Cam - Auto");
             _logger.Debug("Spectator movement before activation: " + _camera.CapturedMovementName +
                 "; active: " + _camera.GetLastWriteDiagnostics().SpectatorMovement + ".");
         }
@@ -322,11 +344,11 @@ namespace SECinematicCamera.Session
             _target.Refresh();
             bool changed;
             bool flyByTimedOut = _director.CurrentShot == ShotType.WorldLockedFlyBy &&
-                _director.ShotAgeSeconds >= 6f;
+                _director.ShotAgeSeconds >= 5f;
             if (flyByTimedOut || _shotSolver.ShouldEndWorldLockedShot(_target, 700.0))
             {
                 string flyByReason = flyByTimedOut
-                    ? "Fly-by reached 6 second limit"
+                    ? "Fly-by reached 5 second limit"
                     : "Fly-by ended: target receded 700 m from the fixed camera";
                 if (_config.Automatic)
                 {
@@ -335,7 +357,7 @@ namespace SECinematicCamera.Session
                 else
                 {
                     _director.RestartCurrent(flyByTimedOut
-                        ? "Manual fly-by repositioned after 6 seconds"
+                        ? "Manual fly-by repositioned after 5 seconds"
                         : "Manual fly-by repositioned at 700 m");
                     ApplyHardCut(_director.LastChangeReason);
                     return;
@@ -345,18 +367,19 @@ namespace SECinematicCamera.Session
             {
                 changed = _director.Update(_target, TickSeconds);
             }
-            CameraPose desired = SolveComposedPose(_target, _director.CurrentShot);
+            CameraPose desired;
             CameraPose pose;
             if (changed)
             {
                 _shotSolver.BeginShot(_target, _director.CurrentShot);
-                desired = SolveComposedPose(_target, _director.CurrentShot);
+                desired = SolveComposedPose(_target, _director.CurrentShot, 0.0);
                 pose = _smoother.Reset(desired, _target.Position);
-                _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name +
+                _logger.Debug("CUT to " + _shotSolver.GetShotName(_director.CurrentShot) +
                     " — " + _director.LastChangeReason + ".");
             }
             else
             {
+                desired = SolveComposedPose(_target, _director.CurrentShot, TickSeconds);
                 pose = _smoother.Step(desired, _target.Position, _target.LinearVelocity,
                     TickSeconds, _config.Smoothing, ShotProfile.Get(_director.CurrentShot),
                     _target.Scale);
@@ -440,16 +463,19 @@ namespace SECinematicCamera.Session
         {
             _target.Refresh();
             _shotSolver.BeginShot(_target, _director.CurrentShot);
-            CameraPose pose = _smoother.Reset(SolveComposedPose(_target, _director.CurrentShot),
+            CameraPose pose = _smoother.Reset(SolveComposedPose(_target, _director.CurrentShot, 0.0),
                 _target.Position);
             pose = _shake.Apply(pose, _target, ShotProfile.Get(_director.CurrentShot), 0.0);
             _camera.ApplyPose(pose);
-            _logger.Debug("CUT to " + ShotProfile.Get(_director.CurrentShot).Name + " — " + reason + ".");
+            _logger.Debug("CUT to " + _shotSolver.GetShotName(_director.CurrentShot) +
+                " — " + reason + ".");
         }
 
-        private CameraPose SolveComposedPose(CinematicTarget target, ShotType shot)
+        private CameraPose SolveComposedPose(CinematicTarget target, ShotType shot,
+            double elapsedSeconds)
         {
-            CameraPose basePose = _shotSolver.Solve(target, shot);
+            CameraPose basePose = _shotSolver.Solve(target, shot, elapsedSeconds,
+                _director.ShotAgeSeconds);
             return _screenComposer.Compose(basePose, target, ShotProfile.Get(shot),
                 _camera.GetProjectionInfo());
         }
