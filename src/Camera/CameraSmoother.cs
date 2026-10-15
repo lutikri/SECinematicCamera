@@ -13,9 +13,7 @@ namespace SECinematicCamera.Camera
         private Vector3D _relativePosition;
         private bool _hasFollowVelocity;
         private Vector3D _aimAnchor;
-        private Vector3D _aimVelocity;
         private Vector3D _relativeAim;
-        private bool _hasAimVelocity;
         private Vector3D _observedTargetVelocity;
         private bool _hasObservedVelocity;
 
@@ -31,9 +29,7 @@ namespace SECinematicCamera.Camera
             _relativeAim = pose.LookAt - targetAnchor;
             _hasPose = true;
             _hasFollowVelocity = false;
-            _hasAimVelocity = false;
             _followVelocity = Vector3D.Zero;
-            _aimVelocity = Vector3D.Zero;
             _observedTargetVelocity = Vector3D.Zero;
             _hasObservedVelocity = false;
             LastPositionLag = 0.0;
@@ -43,15 +39,22 @@ namespace SECinematicCamera.Camera
 
         public CameraPose Step(CameraPose desired, Vector3D targetAnchor,
             Vector3D targetVelocity, double elapsedSeconds, double smoothing,
-            ShotProfile profile, double targetScale)
+            ShotProfile profile, double targetScale, bool orbitEngaged = false)
         {
             if (!_hasPose)
                 return Reset(desired, targetAnchor);
 
             double responseScale = MathHelper.Clamp(smoothing / 0.16, 0.10, 6.0);
-            double positionAmount = DampAmount(profile.PositionDampingSeconds,
+            // Mouse orbit has its own angular inertia. Keep a small pose filter
+            // while adjusting/returning instead of stacking the establishing
+            // shot's several-second rotation lag on top of the user's drag.
+            double positionDamping = orbitEngaged
+                ? System.Math.Min(profile.PositionDampingSeconds, 0.20) : profile.PositionDampingSeconds;
+            double aimDamping = orbitEngaged
+                ? System.Math.Min(profile.AimDampingSeconds, 0.20) : profile.AimDampingSeconds;
+            double positionAmount = DampAmount(positionDamping,
                 elapsedSeconds, responseScale);
-            double aimAmount = DampAmount(profile.AimDampingSeconds,
+            double aimAmount = DampAmount(aimDamping,
                 elapsedSeconds, responseScale);
             if (!_hasObservedVelocity)
             {
@@ -87,18 +90,14 @@ namespace SECinematicCamera.Camera
             if (profile.WorldLocked)
             {
                 _aimAnchor = targetAnchor;
-                _aimVelocity = targetVelocity;
-                _hasAimVelocity = true;
                 _pose.LookAt = SmoothWorldLockedAim(_pose, desired, aimAmount);
             }
             else
             {
-                double aimFollowSeconds = profile.TranslationFollowSeconds <= 0.001
-                    ? 0.0
-                    : profile.AimDampingSeconds * 1.5;
-                UpdateSpring(ref _aimAnchor, ref _aimVelocity, ref _hasAimVelocity,
-                    targetAnchor, _observedTargetVelocity, elapsedSeconds, aimFollowSeconds,
-                    targetScale * profile.MaximumLagScale * 0.55);
+                // Position and aim ride the same operator rig. Two pursuit
+                // springs with different response times turn each acceleration
+                // into an unintended pan, even when the desired angle is fixed.
+                _aimAnchor = _followAnchor;
                 _pose.LookAt = _aimAnchor + _relativeAim;
             }
             _pose.Up = Vector3D.Normalize(Vector3D.Lerp(_pose.Up, desired.Up, aimAmount));
@@ -201,9 +200,7 @@ namespace SECinematicCamera.Camera
             _relativePosition = Vector3D.Zero;
             _hasFollowVelocity = false;
             _aimAnchor = Vector3D.Zero;
-            _aimVelocity = Vector3D.Zero;
             _relativeAim = Vector3D.Zero;
-            _hasAimVelocity = false;
             _observedTargetVelocity = Vector3D.Zero;
             _hasObservedVelocity = false;
             LastPositionLag = 0.0;

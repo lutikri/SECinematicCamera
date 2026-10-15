@@ -80,16 +80,12 @@ namespace SECinematicCamera.Camera
                 return profile.ScreenX;
             viewRight.Normalize();
 
-            Vector3D actionDirection = target.Speed > 1.0
-                ? Vector3D.Normalize((Vector3D)target.LinearVelocity)
-                : target.Framing.Forward;
-            double acrossScreen = Vector3D.Dot(actionDirection, viewRight);
-            if (System.Math.Abs(acrossScreen) < 0.10)
-                return profile.ScreenX;
-
-            // Put the subject opposite its screen-space travel direction, leaving
-            // visible room in front of it.
-            return acrossScreen > 0.0 ? -profile.LeadRoomAmount : profile.LeadRoomAmount;
+            // A sign switch (and a fabricated forward direction below 1 m/s)
+            // flips lead room when braking through zero. Use a continuous curve
+            // that centers gently at rest and builds over several m/s of travel.
+            double acrossSpeed = Vector3D.Dot((Vector3D)target.LinearVelocity, viewRight);
+            double lead = acrossSpeed / System.Math.Sqrt(acrossSpeed * acrossSpeed + 25.0);
+            return profile.ScreenX - profile.LeadRoomAmount * lead;
         }
 
         private static CameraPose AimForScreenPoint(Vector3D cameraPosition, Vector3D focus,

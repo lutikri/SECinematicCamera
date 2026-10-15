@@ -20,10 +20,13 @@ namespace SECinematicCamera.Camera
         private sealed class CameraState
         {
             public MyEntity Entity;
+            public bool FirstPerson;
+            public double ThirdPersonDistance;
             public MySpectatorCameraMovementEnum SpectatorMovement;
         }
 
         private CameraState _savedState;
+        private CameraState _observedView;
         private IMyCameraController _expectedController;
         private CameraWriteDiagnostics _lastWrite;
 
@@ -33,8 +36,7 @@ namespace SECinematicCamera.Camera
             get { return _savedState != null ? _savedState.SpectatorMovement.ToString() : "Unavailable"; }
         }
 
-        public bool TryEnterFixed(CameraPose initialPose, bool preferControlledView,
-            out string reason)
+        public bool TryEnterFixed(CameraPose initialPose, out string reason)
         {
             reason = null;
             if (MyAPIGateway.Session == null || MySpectator.Static == null)
@@ -43,7 +45,7 @@ namespace SECinematicCamera.Camera
                 return false;
             }
 
-            CaptureCurrentState(preferControlledView);
+            CaptureCurrentState();
             try
             {
                 // Set this explicitly. Selecting SpectatorFixed alone does not reliably
@@ -117,27 +119,29 @@ namespace SECinematicCamera.Camera
         public void Restore(bool forceControlledView = false)
         {
             CameraState state = _savedState;
+            bool ownsCamera = HasExpectedCameraController();
             _savedState = null;
             _expectedController = null;
-            if (MyAPIGateway.Session == null)
+            if (state == null || MyAPIGateway.Session == null ||
+                MyAPIGateway.Session.LocalHumanPlayer == null)
                 return;
 
-            // A deterministic first-person fallback is safer than restoring a
-            // stale cockpit or spectator controller. In particular, leaving a
-            // cockpit changes ControlledObject to the character while the saved
-            // cockpit remains valid; restoring that old cockpit makes the next V
-            // press jump back to a camera the player no longer controls.
+            // Never reclaim a camera another system has taken. On a seat change,
+            // restore only the currently controlled entity, never the old cockpit.
+            if (!ownsCamera)
+                return;
             MyEntity currentEntity = GetCurrentControlledEntity();
-            if (!TrySetEntityFirstPerson(currentEntity) && state != null)
-                TrySetEntityFirstPerson(state.Entity);
+            bool sameEntity = currentEntity != null && currentEntity == state.Entity;
+            bool firstPerson = forceControlledView || !sameEntity || state.FirstPerson;
+            TrySetEntityView(currentEntity, firstPerson,
+                sameEntity ? state.ThirdPersonDistance : 0.0);
 
-            if (state != null)
-                RestoreSpectatorMovement(state);
+            RestoreSpectatorMovement(state);
         }
 
         public bool RecoverControlledCockpitFromSpectator()
         {
-            if (MyAPIGateway.Session == null)
+            if (MyAPIGateway.Session == null || MyAPIGateway.Session.LocalHumanPlayer == null)
                 return false;
 
             IMyControllableEntity controlled = MyAPIGateway.Session.ControlledObject;
@@ -149,7 +153,7 @@ namespace SECinematicCamera.Camera
             if (camera != null && camera.Entity != null)
                 return false;
 
-            return TrySetEntityFirstPerson(entity);
+            return TrySetEntityView(entity, true, 0.0);
         }
 
         public bool HasEntityCameraController()
@@ -158,11 +162,6 @@ namespace SECinematicCamera.Camera
                 ? MyAPIGateway.Session.CameraController
                 : null;
             return camera != null && camera.Entity != null;
-        }
-
-        public bool RestoreCurrentControlledFirstPerson()
-        {
-            return TrySetEntityFirstPerson(GetCurrentControlledEntity());
         }
 
         public void ClearTransientState()
@@ -177,31 +176,41 @@ namespace SECinematicCamera.Camera
                 MySpectator.Static.SpectatorCameraMovement = state.SpectatorMovement;
         }
 
-        private void CaptureCurrentState(bool preferControlledView)
+        public void ObservePlayerView()
         {
+            if (MyAPIGateway.Session == null || MyAPIGateway.Session.LocalHumanPlayer == null)
+                return;
+            MyEntity entity = GetCurrentControlledEntity();
             IMyCameraController controller = MyAPIGateway.Session.CameraController;
-            MyEntity entity = controller != null ? controller.Entity : null;
-            MySpectator spectator = MySpectator.Static;
+            if (entity != null && controller != null && controller.Entity == entity)
+                _observedView = ReadEntityView(entity, controller);
+        }
+
+        private void CaptureCurrentState()
+        {
+            MyEntity entity = GetCurrentControlledEntity();
+            IMyCameraController controller = MyAPIGateway.Session.CameraController;
+            CameraState view = controller != null && controller.Entity == entity
+                ? ReadEntityView(entity, controller)
+                : _observedView != null && _observedView.Entity == entity
+                    ? _observedView : ReadEntityView(entity, entity as IMyCameraController);
             _savedState = new CameraState
             {
                 Entity = entity,
-                SpectatorMovement = spectator.SpectatorCameraMovement
+                FirstPerson = view.FirstPerson,
+                ThirdPersonDistance = view.ThirdPersonDistance,
+                SpectatorMovement = MySpectator.Static.SpectatorCameraMovement
             };
-
-            if (preferControlledView)
-                PreferControlledView(_savedState);
         }
 
-        private static void PreferControlledView(CameraState state)
+        private static CameraState ReadEntityView(MyEntity entity, IMyCameraController controller)
         {
-            IMyControllableEntity controlled = MyAPIGateway.Session != null
-                ? MyAPIGateway.Session.ControlledObject
-                : null;
-            MyEntity entity = controlled != null ? controlled.Entity as MyEntity : null;
-            if (entity == null || entity.Closed || entity.MarkedForClose)
-                return;
-
-            state.Entity = entity;
+            return new CameraState
+            {
+                Entity = entity,
+                FirstPerson = controller == null || controller.IsInFirstPersonView,
+                ThirdPersonDistance = MyAPIGateway.Session.CameraTargetDistance
+            };
         }
 
         private static MyEntity GetCurrentControlledEntity()
@@ -212,7 +221,7 @@ namespace SECinematicCamera.Camera
             return controlled != null ? controlled.Entity as MyEntity : null;
         }
 
-        private static bool TrySetEntityFirstPerson(MyEntity entity)
+        private static bool TrySetEntityView(MyEntity entity, bool firstPerson, double distance)
         {
             if (entity == null || entity.Closed || entity.MarkedForClose ||
                 MyAPIGateway.Session == null)
@@ -221,13 +230,17 @@ namespace SECinematicCamera.Camera
             try
             {
                 IMyCameraController entityCamera = entity as IMyCameraController;
+                if (entityCamera != null && entityCamera.ForceFirstPersonCamera)
+                    firstPerson = true;
                 if (entityCamera != null)
-                    entityCamera.IsInFirstPersonView = true;
+                    entityCamera.IsInFirstPersonView = firstPerson;
 
                 MyAPIGateway.Session.SetCameraController(MyCameraControllerEnum.Entity, entity);
                 IMyCameraController activeCamera = MyAPIGateway.Session.CameraController;
                 if (activeCamera != null)
-                    activeCamera.IsInFirstPersonView = true;
+                    activeCamera.IsInFirstPersonView = firstPerson;
+                if (!firstPerson && distance > 0.0 && !double.IsInfinity(distance) && !double.IsNaN(distance))
+                    MyAPIGateway.Session.CameraTargetDistance = distance;
                 return true;
             }
             catch (System.Exception)

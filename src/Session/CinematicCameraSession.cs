@@ -24,6 +24,7 @@ namespace SECinematicCamera.Session
         private ShotSolver _shotSolver;
         private ScreenComposer _screenComposer;
         private CameraSmoother _smoother;
+        private CameraOrbit _orbit;
         private CameraShake _shake;
         private SECameraAdapter _camera;
         private CinematicSafetyController _safety;
@@ -48,6 +49,7 @@ namespace SECinematicCamera.Session
             _shotSolver = new ShotSolver(_config);
             _screenComposer = new ScreenComposer();
             _smoother = new CameraSmoother();
+            _orbit = new CameraOrbit();
             _shake = new CameraShake();
             _camera = new SECameraAdapter();
             _safety = new CinematicSafetyController();
@@ -56,6 +58,8 @@ namespace SECinematicCamera.Session
                 _logger.Info("Recovered cockpit view | FIRST PERSON");
             else if (!_camera.HasEntityCameraController())
                 _startupRecoveryTicks = 180;
+            _camera.ObservePlayerView();
+            _input.PrepareControlSuppression(false);
         }
 
         public override void UpdateAfterSimulation()
@@ -79,13 +83,27 @@ namespace SECinematicCamera.Session
 
             try
             {
-                if (_input != null && _active && _input.IsExitPressed())
+                string safetyReason;
+                if (_active && !_safety.TryValidate(_target, _camera, out safetyReason))
                 {
-                    EmergencyStop("Cine Cam - Off", true);
+                    EmergencyStop(safetyReason);
                     return;
                 }
 
-                if (_input != null && _input.IsCyclePressed())
+                if (_input != null && _active && _input.IsExitPressed())
+                {
+                    EmergencyStop("Cine Cam - Off");
+                    return;
+                }
+
+                if (_input != null && _input.IsActionPressed())
+                {
+                    if (_active)
+                        CycleManualShot();
+                    else
+                        TryStart();
+                }
+                else if (_input != null && _active && _input.IsCyclePressed())
                 {
                     CycleManualShot();
                 }
@@ -94,19 +112,37 @@ namespace SECinematicCamera.Session
                     if (_active)
                         EmergencyStop("Cine Cam - Off");
                     else
-                        TryStart(true);
+                        TryStart();
                 }
 
                 if (_active)
                     UpdateCinematic();
+                else
+                    _camera.ObservePlayerView();
+                _input.PrepareControlSuppression(_active);
             }
             catch (System.Exception exception)
             {
                 EmergencyStop("Cinematic update exception: " + exception.Message);
             }
+        }
 
-            if (!_active && _input != null)
-                _input.ReleaseSuppressedControls();
+        public override void HandleInput()
+        {
+            if (_unloading || !_active || _input == null ||
+                !CameraOrbit.SupportsShot(_director.CurrentShot))
+                return;
+
+            try
+            {
+                // Accumulate once per input frame; simulation ticks consume it
+                // once, including when rendering and simulation run at different rates.
+                _input.CaptureOrbitInput();
+            }
+            catch (System.Exception exception)
+            {
+                EmergencyStop("Orbit input exception: " + exception.Message);
+            }
         }
 
         public override void UpdateBeforeSimulation()
@@ -143,21 +179,25 @@ namespace SECinematicCamera.Session
         public void CycleManualShot()
         {
             if (!_active)
-            {
-                TryStart(true);
                 return;
-            }
 
             _config.Automatic = false;
             _director.SelectNextManual();
             ApplyHardCut(_director.LastChangeReason);
-            _logger.Info(_shotSolver.GetShotName(_director.CurrentShot));
+            _logger.Info("MANUAL | " + _shotSolver.GetShotName(_director.CurrentShot) +
+                " | T: next | V: exit");
         }
 
         public void SetAutomatic(bool enabled)
         {
             _config.Automatic = enabled;
             _logger.Info(enabled ? "AUTO ON" : "AUTO OFF");
+        }
+
+        public void SetCameraReturn(bool enabled)
+        {
+            _config.OrbitReturnEnabled = enabled;
+            _logger.Info(enabled ? "CAMERA RETURN ON" : "CAMERA RETURN OFF");
         }
 
         public void SetDebug(bool enabled)
@@ -181,7 +221,7 @@ namespace SECinematicCamera.Session
         {
             if (!_active)
             {
-                _logger.Info("Cine Cam - Off | use F9, B, or /cine on");
+                _logger.Info("Cine Cam - Off | use T, F9, or /cine on");
                 return;
             }
 
@@ -222,9 +262,10 @@ namespace SECinematicCamera.Session
         public string GetSettings()
         {
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "time {0:0.#}s | dist {1:0.##} | h {2:0.##} | side {3:0.##} | smooth {4:0.##} | lead {5:0.##}",
+                "time {0:0.#}s | dist {1:0.##} | h {2:0.##} | side {3:0.##} | smooth {4:0.##} | lead {5:0.##} | orbit {6:0.###} | return {7}",
                 _config.ShotDurationSeconds, _config.Distance, _config.Height, _config.Side,
-                _config.Smoothing, _config.LookAheadSeconds);
+                _config.Smoothing, _config.LookAheadSeconds, _config.OrbitSensitivity,
+                _config.OrbitReturnEnabled ? "ON" : "OFF");
         }
 
         public void EmergencyStop(string reason, bool forceControlledView = false,
@@ -258,6 +299,8 @@ namespace SECinematicCamera.Session
             catch (System.Exception) { }
             try { if (_smoother != null) _smoother.Clear(); }
             catch (System.Exception) { }
+            try { if (_orbit != null) _orbit.Clear(); }
+            catch (System.Exception) { }
             try { if (_shotSolver != null) _shotSolver.Clear(); }
             catch (System.Exception) { }
             try { if (_camera != null) _camera.ClearTransientState(); }
@@ -282,36 +325,30 @@ namespace SECinematicCamera.Session
             catch (System.Exception) { }
         }
 
-        private void TryStart(bool preferControlledView = false)
+        private void TryStart()
         {
             if (_active)
                 return;
 
             // Manual testing is session-local. Every fresh activation starts in
             // a clearly announced automatic mode instead of silently preserving
-            // Ctrl+F9, Ctrl+B, or /cine cam from the previous activation.
+            // T, Ctrl+F9, or /cine cam from the previous activation.
             _config.Automatic = true;
 
             string reason;
             CinematicTarget target;
             if (!_targetResolver.TryResolve(out target, out reason))
             {
-                // F9 is also Space Engineers' vanilla spectator key. When the
-                // player is on foot, vanilla may switch to free camera before
-                // this mod rejects the missing ship target. Undo that camera
-                // change only for the hotkey path; chat commands do not cause it.
-                if (preferControlledView)
-                    _camera.RestoreCurrentControlledFirstPerson();
                 _logger.Info(reason);
                 return;
             }
 
             target.Refresh();
             _director.Reset(target);
-            _shotSolver.BeginShot(target, _director.CurrentShot);
+            BeginShot(target);
             CameraPose initialPose = SolveComposedPose(target, _director.CurrentShot, 0.0);
             initialPose = _smoother.Reset(initialPose, target.Position);
-            if (!_camera.TryEnterFixed(initialPose, preferControlledView, out reason))
+            if (!_camera.TryEnterFixed(initialPose, out reason))
             {
                 target.Clear();
                 _director.Clear();
@@ -327,7 +364,7 @@ namespace SECinematicCamera.Session
             _debugReportSeconds = 0f;
             _spaceWasPressed = false;
             _spaceDebugSeconds = 0f;
-            _logger.Info("Cine Cam - Auto");
+            _logger.Info("Cine Cam - Auto | T: manual camera | V: exit");
             _logger.Debug("Spectator movement before activation: " + _camera.CapturedMovementName +
                 "; active: " + _camera.GetLastWriteDiagnostics().SpectatorMovement + ".");
         }
@@ -342,6 +379,9 @@ namespace SECinematicCamera.Session
             }
 
             _target.Refresh();
+            _orbit.Step(_director.CurrentShot, _input.IsOrbitHeld(),
+                _input.ConsumeOrbitDelta(), TickSeconds, _config.OrbitSensitivity,
+                _config.OrbitReturnEnabled);
             bool changed;
             bool flyByTimedOut = _director.CurrentShot == ShotType.WorldLockedFlyBy &&
                 _director.ShotAgeSeconds >= 5f;
@@ -365,13 +405,13 @@ namespace SECinematicCamera.Session
             }
             else
             {
-                changed = _director.Update(_target, TickSeconds);
+                changed = !_orbit.IsEngaged && _director.Update(_target, TickSeconds);
             }
             CameraPose desired;
             CameraPose pose;
             if (changed)
             {
-                _shotSolver.BeginShot(_target, _director.CurrentShot);
+                BeginShot(_target);
                 desired = SolveComposedPose(_target, _director.CurrentShot, 0.0);
                 pose = _smoother.Reset(desired, _target.Position);
                 _logger.Debug("CUT to " + _shotSolver.GetShotName(_director.CurrentShot) +
@@ -382,7 +422,7 @@ namespace SECinematicCamera.Session
                 desired = SolveComposedPose(_target, _director.CurrentShot, TickSeconds);
                 pose = _smoother.Step(desired, _target.Position, _target.LinearVelocity,
                     TickSeconds, _config.Smoothing, ShotProfile.Get(_director.CurrentShot),
-                    _target.Scale);
+                    _target.Scale, _orbit.HasOffset && _orbit.IsEngaged);
             }
             CameraPose finalPose = _shake.Apply(pose, _target,
                 ShotProfile.Get(_director.CurrentShot), _director.ShotAgeSeconds);
@@ -462,7 +502,7 @@ namespace SECinematicCamera.Session
         private void ApplyHardCut(string reason)
         {
             _target.Refresh();
-            _shotSolver.BeginShot(_target, _director.CurrentShot);
+            BeginShot(_target);
             CameraPose pose = _smoother.Reset(SolveComposedPose(_target, _director.CurrentShot, 0.0),
                 _target.Position);
             pose = _shake.Apply(pose, _target, ShotProfile.Get(_director.CurrentShot), 0.0);
@@ -476,8 +516,16 @@ namespace SECinematicCamera.Session
         {
             CameraPose basePose = _shotSolver.Solve(target, shot, elapsedSeconds,
                 _director.ShotAgeSeconds);
+            basePose = _orbit.Apply(basePose, target.Position, shot);
             return _screenComposer.Compose(basePose, target, ShotProfile.Get(shot),
                 _camera.GetProjectionInfo());
+        }
+
+        private void BeginShot(CinematicTarget target)
+        {
+            _orbit.Clear();
+            _input.ClearOrbitInput();
+            _shotSolver.BeginShot(target, _director.CurrentShot);
         }
     }
 }

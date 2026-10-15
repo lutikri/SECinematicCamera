@@ -83,6 +83,9 @@ namespace SECinematicCamera.Input
                 case "auto":
                     SetBoolean(args, "auto", value => _session.SetAutomatic(value));
                     return;
+                case "return":
+                    SetBoolean(args, "return", value => _session.SetCameraReturn(value));
+                    return;
                 case "cam":
                     SelectCamera(args);
                     return;
@@ -161,6 +164,10 @@ namespace SECinematicCamera.Input
                     valid = value >= 0.0 && value <= 5.0;
                     if (valid) _config.LookAheadSeconds = value;
                     break;
+                case "orbitsensitivity":
+                    valid = value >= 0.005 && value <= 0.5;
+                    if (valid) _config.OrbitSensitivity = value;
+                    break;
                 default:
                     ShowSetUsage();
                     return;
@@ -208,13 +215,14 @@ namespace SECinematicCamera.Input
 
         private void ShowSetUsage()
         {
-            _logger.Info("set: duration|distance|height|side|smoothing|lookahead");
+            _logger.Info("set: duration|distance|height|side|smoothing|lookahead|orbitsensitivity");
         }
 
         private void ShowHelp()
         {
             _logger.Info("/cine on|off|next|status|get|reset|help");
             _logger.Info("/cine auto on|off | debug on|off");
+            _logger.Info("/cine return on|off");
             _logger.Info("/cine cam <name|1-10>");
             ShowSetUsage();
         }

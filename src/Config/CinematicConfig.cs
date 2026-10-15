@@ -10,9 +10,10 @@ namespace SECinematicCamera.Config
         public const double DefaultSide = 1.1;
         public const double DefaultSmoothing = 0.16;
         public const double DefaultLookAheadSeconds = 0.05;
+        public const double DefaultOrbitSensitivity = 0.03;
 
         public MyKeys ToggleKey { get; private set; }
-        public MyKeys AlternateToggleKey { get; private set; }
+        public MyKeys ActionKey { get; private set; }
         public MyKeys ExitKey { get; private set; }
         public MyKeys CycleKey { get; private set; }
         public float ShotDurationSeconds { get; set; }
@@ -21,13 +22,15 @@ namespace SECinematicCamera.Config
         public double Side { get; set; }
         public double Smoothing { get; set; }
         public double LookAheadSeconds { get; set; }
+        public double OrbitSensitivity { get; set; }
+        public bool OrbitReturnEnabled { get; set; }
         public bool Automatic { get; set; }
         public bool DebugEnabled { get; set; }
 
         public CinematicConfig()
         {
             ToggleKey = MyKeys.F9;
-            AlternateToggleKey = MyKeys.B;
+            ActionKey = MyKeys.T;
             ExitKey = MyKeys.V;
             CycleKey = MyKeys.F9;
             Reset();
@@ -41,6 +44,8 @@ namespace SECinematicCamera.Config
             Side = DefaultSide;
             Smoothing = DefaultSmoothing;
             LookAheadSeconds = DefaultLookAheadSeconds;
+            OrbitSensitivity = DefaultOrbitSensitivity;
+            OrbitReturnEnabled = true;
             Automatic = true;
             DebugEnabled = false;
         }

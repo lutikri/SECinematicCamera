@@ -23,6 +23,9 @@ namespace SECinematicCamera.Camera
         private bool _hasChaseVelocity;
         private Vector3D _chaseStableUp;
         private bool _hasChaseUp;
+        private Vector3D _motionVelocity;
+        private Vector3D _chaseForward;
+        private bool _hasChaseForward;
 
         public ShotSolver(CinematicConfig config)
         {
@@ -38,7 +41,10 @@ namespace SECinematicCamera.Camera
             Vector3D right;
             bool gravityAligned;
             ResolveFrame(target, out up, out forward, out right, out gravityAligned);
-            Vector3D lookAhead = (Vector3D)target.LinearVelocity * _config.LookAheadSeconds;
+            if (elapsedSeconds > 0.0)
+                _motionVelocity = Vector3D.Lerp(_motionVelocity, target.LinearVelocity,
+                    1.0 - Math.Exp(-elapsedSeconds / 0.8));
+            Vector3D lookAhead = _motionVelocity * _config.LookAheadSeconds;
             double maximumLookAhead = System.Math.Max(0.5, target.Scale * 0.15);
             if (lookAhead.LengthSquared() > maximumLookAhead * maximumLookAhead)
                 lookAhead = Vector3D.Normalize(lookAhead) * maximumLookAhead;
@@ -82,20 +88,34 @@ namespace SECinematicCamera.Camera
             Vector3D shipForward, Vector3D shipRight, bool gravityAligned,
             Vector3D lookAt, double elapsedSeconds, double shotAgeSeconds)
         {
-            Vector3D velocity = target.LinearVelocity;
+            Vector3D velocity = _motionVelocity;
             double speed = velocity.Length();
             Vector3D trajectoryForward = shipForward;
-            if (speed > 0.5)
+            if (speed > 4.0)
             {
                 Vector3D velocityDirection = velocity / speed;
-                double velocityWeight = MathHelper.Clamp((speed - 2.0) / 20.0, 0.0, 1.0);
-                trajectoryForward = shipForward * (1.0 - velocityWeight) +
-                    velocityDirection * velocityWeight;
-                if (trajectoryForward.LengthSquared() < 0.001)
-                    trajectoryForward = velocityDirection;
-                else
-                    trajectoryForward.Normalize();
+                double velocityWeight = MathHelper.Clamp((speed - 4.0) / 26.0, 0.0, 1.0);
+                double angle = Math.Acos(MathHelper.Clamp(
+                    Vector3D.Dot(shipForward, velocityDirection), -1.0, 1.0));
+                trajectoryForward = CameraMotion.RotateTowards(shipForward,
+                    velocityDirection, frameUp, angle * velocityWeight);
             }
+
+            if (!_hasChaseForward)
+            {
+                _chaseForward = trajectoryForward;
+                _hasChaseForward = true;
+            }
+            else if (elapsedSeconds > 0.0)
+            {
+                double angle = Math.Acos(MathHelper.Clamp(
+                    Vector3D.Dot(_chaseForward, trajectoryForward), -1.0, 1.0));
+                double step = Math.Min(angle * (1.0 - Math.Exp(-elapsedSeconds / 1.8)),
+                    Math.PI / 6.0 * elapsedSeconds);
+                _chaseForward = CameraMotion.RotateTowards(_chaseForward,
+                    trajectoryForward, frameUp, step);
+            }
+            trajectoryForward = _chaseForward;
 
             Vector3D chaseRight = Vector3D.Cross(trajectoryForward, frameUp);
             if (chaseRight.LengthSquared() < 0.001)
@@ -152,7 +172,7 @@ namespace SECinematicCamera.Camera
             }
 
             Vector3D measured = (velocity - _chasePreviousVelocity) / elapsedSeconds;
-            double amount = 1.0 - Math.Exp(-elapsedSeconds / 0.18);
+            double amount = 1.0 - Math.Exp(-elapsedSeconds / 0.65);
             _chaseAcceleration = Vector3D.Lerp(_chaseAcceleration, measured, amount);
             _chasePreviousVelocity = velocity;
         }
@@ -269,6 +289,8 @@ namespace SECinematicCamera.Camera
         {
             _activeShot = shot;
             _hasActiveShot = true;
+            _motionVelocity = target.LinearVelocity;
+            _hasChaseForward = false;
             if (shot == ShotType.Chase)
             {
                 _chaseOffsetVariant = _random.NextDouble() >= 0.5;
@@ -326,6 +348,9 @@ namespace SECinematicCamera.Camera
             _hasChaseVelocity = false;
             _chaseStableUp = Vector3D.Zero;
             _hasChaseUp = false;
+            _motionVelocity = Vector3D.Zero;
+            _chaseForward = Vector3D.Zero;
+            _hasChaseForward = false;
         }
 
         private static void ResolveFrame(CinematicTarget target, out Vector3D up,
