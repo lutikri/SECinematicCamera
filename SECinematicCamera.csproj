@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netframework48</TargetFramework>
     <RootNamespace>SECinematicCamera</RootNamespace>
+    <Version>1.1.0</Version>
     <LangVersion>6</LangVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Configurations>Release;Debug</Configurations>
@@ -28,9 +29,13 @@
     <AdditionalFiles Include="thumb.jpg" Condition="Exists('thumb.jpg')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </AdditionalFiles>
+    <AdditionalFiles Include="metadata.mod">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </AdditionalFiles>
     <AdditionalFiles Remove="Content\*\**\*.cs" />
     <AdditionalFiles Remove="Content\Other content folders" />
     <AdditionalFiles Remove="Content\Data\SBC files can go here" />
     <None Remove="thumb.jpg" />
+    <None Remove="metadata.mod" />
   </ItemGroup>
 </Project>

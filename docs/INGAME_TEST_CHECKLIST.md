@@ -9,7 +9,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Add `SECinematicCamera` to the test world's active mod list.
 - [ ] Load the world without a mod compile error or crash.
 - [ ] Confirm there are no `SECinematicCamera` script errors in `SpaceEngineers.log`.
-- [ ] While on foot in first or third person, press F9. Expected: cinematic mode does not start, vanilla spectator/free camera is immediately cancelled, the character ends in first person, and a concise message says to control a ship or rover first.
+- [ ] While on foot, press T and F9. Expected: CineCam does not start or reserve vanilla controls; F9 retains normal spectator behavior when available.
 - [ ] Enter a cockpit or remote control attached to a valid grid.
 - [ ] Run `/cine status`. Expected: `OFF | next start: AUTO`.
 - [ ] Run `/cine get`. Expected: the compiled runtime settings are shown.
@@ -21,13 +21,15 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] While cinematic mode is active, steer, accelerate, brake, roll, and use normal ship/rover controls. Expected: the vehicle remains fully controllable.
 - [ ] Confirm the camera follows smoothly while staying in the selected opening shot.
 - [ ] Press F9 again. Expected: cinematic mode turns OFF and restores first-person cockpit view.
-- [ ] Press B to enter and exit cinematic mode. Expected: it behaves like F9 and does not also trigger the vanilla build-placement action.
-- [ ] Repeat from third-person view. Expected: F9 exit deliberately falls back to first-person cockpit view.
-- [ ] After that first-person fallback, press V twice. Expected: the same controlled cockpit cleanly changes first → third → first; it must not remain in SpectatorFixed or jump to another cockpit.
-- [ ] Activate from first person and press V. Expected: cinematic mode exits to the current controlled entity's first-person camera, not SpectatorFixed.
-- [ ] Repeat from third person and press V. Expected: first-person fallback is active and subsequent V presses behave normally.
+- [ ] Press T while OFF. Expected: AUTO starts and the hint shows T for manual cameras and V to exit. Press T again several times: each tap hard-cuts to the next manual profile, switches to MANUAL, and never cycles into OFF.
+- [ ] Repeat from third-person view at two different zoom distances. Expected: F9 exit restores third-person view and the entry zoom distance.
+- [ ] After exit, press V twice. Expected: the same controlled cockpit switches first/third normally; it must not remain in SpectatorFixed or jump to another cockpit.
+- [ ] Activate from first person and press V. Expected: cinematic mode exits to the same first-person cockpit view without an additional vanilla V toggle.
+- [ ] Repeat from third person and press V. Expected: the saved third-person mode and zoom are restored; subsequent V presses behave normally.
 - [ ] While active, press Ctrl+F9 repeatedly. Expected: each press hard-cuts to the next manual profile and automatic selection turns OFF; no Blueprint screen opens.
-- [ ] Repeat with Ctrl+B. Expected: it cycles manual profiles without creating a blueprint; after CineCam exits, the vanilla B/Ctrl+B controls work normally again.
+- [ ] Press Ctrl+F9 while OFF: CineCam stays OFF. Press Ctrl+T, Alt+T, and Shift+T: no CineCam action. Confirm B/Ctrl+B retain vanilla behavior.
+- [ ] Open cockpit building mode and press T: vanilla orientation reset works and CineCam does not activate/cycle. Repeat with chat, inventory, terminal, and menus open: no CineCam hotkey is handled. Close them and confirm T/F9 work again.
+- [ ] With spectators enabled, enter and exit using F9 from both view modes, including rapid toggles. Expected: vanilla static spectator does not override CineCam or the restored cockpit camera.
 - [ ] If a saved world loads into spectator while a cockpit is still controlled, expected: startup recovery immediately selects that cockpit in first person.
 - [ ] Toggle ON/OFF rapidly several times. Expected: no stuck camera, repeated exception, or loss of vehicle control.
 
@@ -44,7 +46,7 @@ Record failures with the test number, what happened, the expected result, and th
 - [ ] Combine translation, mouse/gyro, and roll controls for at least 15 seconds. Expected: no accumulating camera offset or rotation.
 - [ ] Accelerate from 0 to maximum speed in a straight line. Expected: the camera does not spring behind and the ship remains framed near its intended screen position.
 - [ ] Release thrust at maximum speed and decelerate. Expected: there is no large catch-up movement from the camera.
-- [ ] Turn cinematic mode OFF. Expected: the current controlled entity owns a first-person camera and spectator movement no longer affects it.
+- [ ] Turn cinematic mode OFF. Expected: the current controlled entity has its saved first/third-person mode and spectator movement no longer affects it.
 
 ## 4. Chat command handling
 
@@ -116,7 +118,7 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Accelerate sharply. Expected: the vehicle moves forward in frame before the spring catches up, and camera distance briefly increases with acceleration.
 - [ ] Compare low and high constant speeds. Expected: Chase runs farther from the vehicle at higher speed.
 - [ ] Turn sharply at speed. Expected: the camera initially preserves its old world-space trajectory, then smoothly settles behind the new trajectory instead of snapping behind grid Forward.
-- [ ] Fly with strong lateral slip. Expected: Chase follows velocity direction progressively above roughly 2 m/s and is primarily trajectory-aligned by roughly 22 m/s.
+- [ ] Fly with strong lateral slip. Expected: Chase follows velocity direction progressively above roughly 4 m/s and is primarily trajectory-aligned by roughly 30 m/s, with heading changes limited to 30 degrees per second.
 - [ ] For Chase Rear, confirm the view remains nearly centered behind the trajectory with only a subtle lateral drift.
 - [ ] For Chase Offset, remain in the shot long enough to see a continuous rear-left/center/rear-right wander with no internal cut.
 - [ ] Roll rapidly on a planet. Expected: the horizon carries about 30% of vehicle roll instead of matching it fully.
@@ -153,6 +155,30 @@ Test these while stationary, moving forward, reversing, and turning:
 - [ ] Select `/cine cam distant`. Expected: an extremely wide view about five times farther than before makes the ship very small against the world, permits broad movement within frame, barely reacts to brief mouse turns, and has no shake.
 - [ ] Test both mounted cameras on unusually shaped grids. They intentionally do not force the whole bounding box onscreen; note any placement inside blocks for later mount-clearance tuning.
 
+### Thrust taps and reversal regression
+
+- [ ] In rear, front, side-left, side-right, overhead, distant, and Chase, tap W/A/S/D individually at low speed. Expected: ship motion remains visible, but there is no separate camera pan or jerk on every key transition. Mounted cameras intentionally remain rigid.
+- [ ] In both side shots and distant, drift forward at 0.5–3 m/s, tap S through a complete stop into reverse, then repeat in the other direction. Expected: lead room crosses center gradually without a fast aim flip or a special jump near 1 m/s.
+- [ ] In Chase, reverse through 0, 4, 12, 17, and 30 m/s with no ship rotation, then repeat with slight lateral thrust. Expected: the heading remains finite and continuous, low-speed taps do not swing the camera around, and sustained high-speed reversal produces a gradual response instead of a flip.
+- [ ] Repeat with dampeners ON and OFF, and in gravity/zero gravity. Confirm manual/automatic shot changes still hard-cut without an interpolated travel path.
+
+### Alt + mouse orbit
+
+- [ ] Select Chase, rear, front, both side shots, and distant. Hold Alt and move the mouse slowly in both axes. Expected: the camera orbits the ship with low sensitivity and eased angular motion, while keeping it framed; simply holding Alt without moving does not change the angle.
+- [ ] While holding Alt, use W/A/S/D, Space, C, and roll controls. Expected: translation and keyboard roll remain available, and mouse movement does not also yaw/pitch the ship. Release Alt and confirm normal mouse steering returns.
+- [ ] Release Alt after a small drag, a large drag, and multiple complete horizontal orbits. Expected: a gentle return by the shortest horizontal arc, without a snap or prolonged spinning. Vertical motion stays away from the pole.
+- [ ] In AUTO, orbit and hold the view longer than the shot's normal duration. Expected: automatic cuts pause while freelooking/returning and resume afterward, retaining AUTO mode. T/Ctrl+F9 and manual chat selection still hard-cut immediately and discard the previous orbit offset.
+- [ ] In both mounted shots, hold Alt and pan/tilt the mouse. Expected: smooth aim rotation from the same hull anchor, no orbit or extra positional lag, and no mouse steering of the ship. Release Alt: aim eases back parallel to cockpit Forward. Repeat while the ship translates, pitches, yaws, and rolls, in gravity and zero gravity.
+- [ ] In both mounted shots, drag far upward/downward and through a full horizontal turn. Expected: pitch stays within ±65 degrees of the mount's local frame, the camera remains attached, and return/cut/exit behavior works as in the tracking shots.
+- [ ] Try Alt + mouse in fly-by and overhead shots. Expected: their existing camera rules remain unchanged and their timers are not paused by Alt.
+- [ ] Open chat, inventory, terminal, building mode, or a menu while freelooking. Expected: mouse movement in those interfaces does not accumulate as camera input; after closing, there is no queued jump.
+- [ ] Compare slow and fast drags at low/high rendering frame rates. Expected: each mouse displacement is consumed once, fast swipes accelerate smoothly, and slow drags remain usable with game mouse sensitivity below 1.
+- [ ] Change the native freelook binding and X/Y inversion in the game's options. Expected: CineCam follows the native binding and inversion. Restore the options afterward.
+- [ ] Try `/cine set orbitsensitivity 0.015` and `0.06`, then `/cine reset`. Expected: lower/higher mouse sensitivity for tracking orbit and mounted aim, and the restored `0.03` default; values outside `0.005`–`0.5` are rejected.
+- [ ] Run `/cine return off`, adjust a tracking shot and both mounted shots, then release Alt. Expected: smoothed mouse motion finishes and the adjusted angle stays relative to that shot; AUTO timing resumes after settling. Camera cuts reset the angle, and cinematic OFF/ON preserves the return setting.
+- [ ] Run `/cine return on` while an angle is retained: it eases back. Switch return OFF during that return: it keeps the current angle without jumping. `/cine get` reports the setting; `/cine reset` restores return ON. Invalid `/cine return` arguments show usage without changing the setting or sending the command to multiplayer chat.
+- [ ] Exit with V/F9, switch seats, or trigger a camera takeover during orbit. Expected: the usual safe shutdown/view restoration applies and the next activation has no leftover orbit input.
+
 ## 10. Debug output
 
 - [ ] Run `/cine debug on`. Expected: confirmation is shown.
@@ -187,7 +213,7 @@ Perform these one at a time, re-entering cinematic mode between tests:
 
 - [ ] No game crash, repeating exception, or permanently stuck camera.
 - [ ] Vehicle controls remain active for the entire cinematic session.
-- [ ] Current controlled entity reliably receives first-person camera ownership after normal exit and safe shutdown.
+- [ ] Normal exit restores the entry first/third-person mode and zoom for the same controlled entity; safe shutdown never restores a stale cockpit or steals a camera after takeover.
 - [ ] All ten profiles work in gravity and zero gravity.
 - [ ] All shot changes are hard cuts.
 - [ ] Automatic selection is varied and obeys side continuity.

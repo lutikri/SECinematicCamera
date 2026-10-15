@@ -1,0 +1,38 @@
+Paste each block into the matching Steam Workshop update entry.
+The historical entries are reconstructed from repository history.
+
+15 October 2026 - v1.1.0
+------------------------
+[b]v1.1.0 - Camera Control Update[/b]
+[list]
+[*] Added smoothed Alt + mouse orbit to tracking cameras and pan/tilt to mounted cameras.
+[*] Added /cine return on and /cine return off to choose whether the camera returns after releasing Alt.
+[*] Added adjustable mouse sensitivity; the default is 0.03.
+[*] T now starts cinematic mode and cycles cameras while active. F9 toggles, Ctrl+F9 cycles, and V exits. B and Ctrl+B keep their vanilla behavior.
+[*] Normal exit now restores the previous first/third-person view and third-person zoom when the same cockpit is still controlled.
+[*] Reduced thrust-tap panning and abrupt camera rotation when braking or reversing.
+[*] Automatic cuts pause during mouse adjustment and return, then resume. Manual camera changes remain hard cuts.
+[*] Updated the thumbnail, documentation, and command reference image.
+[/list]
+
+3 October 2026 - v0.5.0
+-----------------------
+[b]v0.5.0 - Chase Cameras[/b]
+[list]
+[*] Added CHASE Rear and CHASE Offset cameras with trajectory following, spring lag, and speed/acceleration response.
+[*] Added B / Ctrl+B controls.
+[*] Switched mod feedback to temporary HUD notifications.
+[*] Fixed cinematic mode repeatedly starting with the same rear-left camera; new activations start in AUTO with varied opening shots.
+[*] Refined shot selection, camera timing, and fly-by behavior.
+[/list]
+
+16 September 2026 - Initial Workshop release
+--------------------------------------------
+[b]Initial Workshop Release[/b]
+[list]
+[*] Added an automatic cinematic camera director for the locally controlled ship or rover.
+[*] Included rear, side, front, overhead, mounted, distant, and world-locked fly-by shots.
+[*] Added smooth following within shots and hard cuts between different camera angles.
+[*] Added manual camera selection and runtime tuning through local /cine commands.
+[*] Added gravity-relative planetary framing, cockpit-relative zero-gravity framing, and safe camera shutdown.
+[/list]
